@@ -278,6 +278,8 @@ onValue(dataRef, (snapshot) => {
     </div>
     <label>Link URL <span style="font-size:10px;color:#aaa;">(optional)</span></label>
     <input type="url" id="edit-url" placeholder="https://..." />
+    <label>Notes <span style="font-size:10px;color:#aaa;">(optional)</span></label>
+    <textarea id="edit-notes" placeholder="Add any additional details..." style="width:100%;padding:8px 10px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:80px;"></textarea>
     <div class="modal-actions">
       <button onclick="closeModal()">Cancel</button>
       <button class="danger" onclick="deleteTask()">Delete</button>
@@ -587,6 +589,7 @@ function renderAll() {
           <div class="task-meta">
             <span class="cat-badge" style="${getBadgeStyle(task.cat)}">${getCatIcon(task.cat)} ${getCatLabel(task.cat)}</span>
             <span class="priority-pill p-${p}" title="Click to cycle priority">${p}</span>
+            ${task.notes ? `<span style="font-size:10px;color:#94a3b8;" title="${task.notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
           </div>
         </div>`;
 
@@ -776,6 +779,7 @@ function openModal(id) {
   const task = tasks.find(t => t.id === id);
   document.getElementById('edit-text').value = task.text;
   document.getElementById('edit-url').value = task.url || '';
+  document.getElementById('edit-notes').value = task.notes || '';
   rebuildCatSelects();
   document.getElementById('edit-cat').value = task.cat;
   editTaskPriority = task.priority || 'medium';
@@ -790,6 +794,7 @@ function saveEdit() {
   tk.priority = editTaskPriority;
   tk.cat = newCat;
   tk.url = document.getElementById('edit-url').value.trim() || '';
+  tk.notes = document.getElementById('edit-notes').value.trim() || '';
   if (!SYSTEM_COLS.includes(tk.col) && tk.col !== 'pending') tk.col = newCat;
   closeModal(); save(); renderAll(); updateStats();
 }
@@ -901,6 +906,6 @@ function ctxDelete() {
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.3</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.4</div>
 </body>
 </html>
