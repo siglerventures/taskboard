@@ -5,6 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Philinity's Task Board</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
+  authDomain: "philinity-893d2.firebaseapp.com",
+  databaseURL: "https://philinity-893d2-default-rtdb.firebaseio.com",
+  projectId: "philinity-893d2",
+  storageBucket: "philinity-893d2.firebasestorage.app",
+  messagingSenderId: "443020781676",
+  appId: "1:443020781676:web:614ec91c9ba33076eb9049"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const dataRef = ref(db, 'philinity');
+
+// Expose to global scope for the rest of the script
+window._fbRef = dataRef;
+window._fbSet = set;
+window._fbOnValue = onValue;
+window._fbReady = true;
+
+// Listen for real-time changes from Firebase
+onValue(dataRef, (snapshot) => {
+  const data = snapshot.val();
+  if (!data) return;
+  // Only update if data changed externally (not from our own save)
+  if (window._suppressListener) return;
+  tasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
+  categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  completionLog = data.completionLog || [];
+  taskOrder = data.taskOrder || {};
+  nextId = data.nextId || 100;
+  nextCatId = data.nextCatId || 50;
+  rebuildCatSelects();
+  renderAll();
+  renderHistory();
+  showSyncNotice('Synced ☁️');
+});
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f3ee; min-height: 100vh; padding: 1.25rem 1.5rem; color: #1a1a1a; }
@@ -326,6 +368,7 @@ let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false;
 
 function load() {
+  // Load from localStorage as initial fallback while Firebase connects
   try {
     tasks = JSON.parse(localStorage.getItem('phil-tasks-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_TASKS));
     categories = JSON.parse(localStorage.getItem('phil-cats-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
@@ -340,17 +383,34 @@ function load() {
   }
 }
 
+function showSyncNotice(msg) {
+  const el = document.getElementById('save-notice');
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.textContent = '', 2000);
+}
+
 function save() {
+  // Save to localStorage as backup
   localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
   localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
   localStorage.setItem('phil-log-v6', JSON.stringify(completionLog));
   localStorage.setItem('phil-taskorder-v6', JSON.stringify(taskOrder));
   localStorage.setItem('phil-nextid-v6', nextId);
   localStorage.setItem('phil-nextcatid-v6', nextCatId);
-  const el = document.getElementById('save-notice');
-  el.textContent = 'Saved ✓';
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.textContent = '', 1500);
+
+  // Save to Firebase
+  if (window._fbRef && window._fbSet) {
+    window._suppressListener = true;
+    window._fbSet(window._fbRef, { tasks, categories, completionLog, taskOrder, nextId, nextCatId })
+      .then(() => {
+        showSyncNotice('Saved ☁️ ✓');
+        setTimeout(() => window._suppressListener = false, 1000);
+      })
+      .catch(() => showSyncNotice('Saved locally ✓'));
+  } else {
+    showSyncNotice('Saved locally ✓');
+  }
 }
 
 function getCatById(id) { return categories.find(c => c.id === id); }
