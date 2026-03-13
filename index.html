@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Philinity's Task Board</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f3ee; min-height: 100vh; padding: 1.25rem 1.5rem; color: #1a1a1a; }
+
+  /* Top bar */
+  .top-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .top-bar h1 { font-size: 18px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+  .top-bar input[type="text"] { flex: 1; min-width: 160px; padding: 7px 12px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
+  .top-bar select { padding: 7px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
+  .top-bar button { padding: 7px 13px; border-radius: 8px; border: 0.5px solid #ddd; background: #fff; font-size: 13px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .top-bar button:hover { background: #f0ede6; }
+  .top-bar button.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .top-bar button.primary:hover { background: #333; }
+  .priority-btns { display: flex; gap: 5px; flex-shrink: 0; }
+  .priority-btn { padding: 7px 11px; border-radius: 8px; border: 1.5px solid #eee; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; transition: all 0.15s; white-space: nowrap; }
+  .priority-btn.selected-high { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .priority-btn.selected-medium { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+  .priority-btn.selected-low { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+  .sort-label { font-size: 12px; color: #888; white-space: nowrap; }
+  .save-notice { font-size: 11px; color: #4caf50; min-height: 14px; margin-bottom: 0.5rem; }
+
+  /* Board */
+  .columns-wrap { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; margin-bottom: 1.5rem; }
+  .col { background: #eae8e1; border-radius: 12px; padding: 10px; min-width: 190px; width: 190px; flex-shrink: 0; }
+  .col.drag-over { outline: 2px dashed #888; outline-offset: -2px; }
+  .col.col-drag-over { outline: 2px dashed #6366f1; outline-offset: -2px; background: #eeeaff; }
+  .col-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+  .col-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+  .col-title { font-size: 11px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; flex: 1; }
+  .col-count { font-size: 11px; color: #999; }
+  .task-list { min-height: 48px; }
+  .task { background: #fff; border: 0.5px solid #e5e2db; border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; cursor: grab; display: flex; align-items: flex-start; gap: 8px; user-select: none; transition: box-shadow 0.15s, opacity 0.15s; }
+  .task:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .task:active { cursor: grabbing; }
+  .task.dragging { opacity: 0.3; }
+  .check { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #ccc; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
+  .check:hover { border-color: #4caf50; }
+  .check svg { display: none; width: 8px; height: 8px; }
+  .task-body { flex: 1; min-width: 0; }
+  .task-text { font-size: 12px; line-height: 1.4; word-break: break-word; }
+  .task-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; align-items: center; }
+  .cat-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
+  .priority-pill { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; cursor: pointer; }
+  .priority-pill:hover { opacity: 0.75; }
+  .p-high { background: #fee2e2; color: #991b1b; }
+  .p-medium { background: #fef3c7; color: #92400e; }
+  .p-low { background: #d1fae5; color: #065f46; }
+  .task-link { display: inline-flex; align-items: center; margin-left: 4px; color: #6366f1; opacity: 0.7; flex-shrink: 0; }
+  .task-link:hover { opacity: 1; }
+  .task-link svg { width: 11px; height: 11px; }
+  .drop-hint { font-size: 11px; color: #bbb; text-align: center; padding: 14px 6px; border: 1px dashed #ddd; border-radius: 8px; }
+  .task-insert-line { height: 3px; background: #6366f1; border-radius: 2px; margin: 2px 0; }
+
+  /* Mid section: manage cats + stats */
+  .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+  .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #f4f3ee; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .manage-cats-btn:hover { background: #eae8e1; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .stat { background: #f4f3ee; border-radius: 10px; padding: 0.5rem 0.9rem; min-width: 65px; }
+  .stat-num { font-size: 20px; font-weight: 600; }
+  .stat-label { font-size: 10px; color: #888; margin-top: 1px; }
+
+  /* Manage cats dropdown */
+  .cat-panel { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 0.5px solid #f0ede6; }
+  .cat-panel.open { display: block; }
+  .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .cat-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; border: 0.5px solid #e0ddd6; background: #fafaf8; font-size: 12px; font-weight: 500; }
+  .cat-chip .chip-count { font-size: 10px; color: #aaa; }
+  .cat-chip .chip-edit { cursor: pointer; color: #ccc; font-size: 11px; border: none; background: none; padding: 0 2px; }
+  .cat-chip .chip-edit:hover { color: #6366f1; }
+  .cat-chip .chip-del { cursor: pointer; color: #ccc; font-size: 15px; line-height: 1; border: none; background: none; padding: 0; }
+  .cat-chip .chip-del:hover { color: #e53e3e; }
+  .add-cat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .add-cat-row input { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
+  .add-cat-row select { padding: 6px 9px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
+  .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; cursor: pointer; }
+
+  /* Bottom section */
+  .bottom-section-title { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
+  .bottom-section { display: grid; grid-template-columns: 280px 1fr 1fr; gap: 16px; align-items: stretch; }
+  @media (max-width: 900px) { .bottom-section { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 580px) { .bottom-section { grid-template-columns: 1fr; } }
+  .bottom-card { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1.25rem; display: flex; flex-direction: column; }
+  .bottom-card h3 { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .done-task-list { max-height: 320px; overflow-y: auto; flex: 1; }
+  .done-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #f0ede6; }
+  .done-item:last-child { border-bottom: none; }
+  .done-uncheck { width: 15px; height: 15px; border-radius: 50%; background: #4caf50; border: none; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+  .done-uncheck svg { width: 7px; height: 7px; }
+  .done-text { font-size: 12px; color: #aaa; text-decoration: line-through; flex: 1; line-height: 1.4; }
+  .chart-wrap { position: relative; flex: 1; min-height: 160px; }
+  .log-list { max-height: 280px; overflow-y: auto; flex: 1; }
+  .log-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #f0ede6; }
+  .log-item:last-child { border-bottom: none; }
+  .log-text { font-size: 12px; color: #888; text-decoration: line-through; flex: 1; line-height: 1.4; }
+  .log-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+  .log-date { color: #bbb; font-size: 11px; white-space: nowrap; }
+  .empty-state { font-size: 13px; color: #bbb; text-align: center; padding: 1.5rem 0; }
+  .clear-done-btn { font-size: 11px; color: #e53e3e; border: none; background: none; cursor: pointer; padding: 0; float: right; }
+  .clear-done-btn:hover { text-decoration: underline; }
+
+  /* Modals */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; }
+  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
+  .modal label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; margin-top: 10px; }
+  .modal input, .modal select { width: 100%; padding: 8px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
+  .modal-actions button { padding: 7px 16px; border-radius: 8px; border: 0.5px solid #ddd; font-size: 13px; cursor: pointer; background: #fff; }
+  .modal-actions button.confirm { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+  .modal-actions button.danger { color: #e53e3e; }
+  .edit-priority-btns { display: flex; gap: 8px; margin-top: 4px; }
+  .edit-priority-btns .priority-btn { flex: 1; padding: 8px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- TOP: title + new task + sort -->
+<div class="top-bar">
+  <h1>📋 Philinity's Task Board</h1>
+  <input type="text" id="new-task-text" placeholder="New task..." />
+  <select id="new-task-cat"></select>
+  <div class="priority-btns">
+    <button class="priority-btn" id="pb-high" onclick="setNewPriority('high')">🔴 High</button>
+    <button class="priority-btn selected-medium" id="pb-medium" onclick="setNewPriority('medium')">🟡 Med</button>
+    <button class="priority-btn" id="pb-low" onclick="setNewPriority('low')">🟢 Low</button>
+  </div>
+  <button class="primary" onclick="addTask()">+ Add</button>
+  <span class="sort-label">Sort:</span>
+  <select id="sort-select" onchange="renderAll()" style="min-width:160px;">
+    <option value="manual">Manual (drag to reorder)</option>
+    <option value="priority">Priority (High → Low)</option>
+    <option value="priority-asc">Priority (Low → High)</option>
+    <option value="alpha">Alphabetical</option>
+    <option value="added">Date added</option>
+  </select>
+  <div style="display:flex;gap:6px;margin-left:auto;flex-shrink:0;">
+    <button onclick="exportData()" title="Export backup JSON" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">⬇ Export</button>
+    <button onclick="document.getElementById('import-input').click()" title="Import backup JSON" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">⬆ Import</button>
+  </div>
+  <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
+</div>
+<div class="save-notice" id="save-notice"></div>
+
+<!-- BOARD -->
+<div class="columns-wrap" id="columns-wrap"></div>
+
+<!-- MID: Manage Categories + Stats -->
+<div class="mid-section">
+  <div class="mid-row">
+    <button class="manage-cats-btn" onclick="toggleCatPanel()">🗂 Manage Categories ▾</button>
+    <div class="stats">
+      <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">Total</div></div>
+      <div class="stat"><div class="stat-num" id="s-pending" style="color:#6b7280;">0</div><div class="stat-label">Pending</div></div>
+      <div class="stat"><div class="stat-num" id="s-done" style="color:#4caf50;">0</div><div class="stat-label">Done</div></div>
+      <div class="stat"><div class="stat-num" id="s-alltime" style="color:#6366f1;">0</div><div class="stat-label">All-time</div></div>
+      <div class="stat"><div class="stat-num" id="s-pct">0%</div><div class="stat-label">Progress</div></div>
+    </div>
+  </div>
+  <div class="cat-panel" id="cat-panel">
+    <div class="cat-list" id="cat-list"></div>
+    <div class="add-cat-row">
+      <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
+      <select id="new-cat-icon">
+        <option value="📁">📁 Folder</option><option value="⭐">⭐ Star</option>
+        <option value="👤">👤 Person</option><option value="💼">💼 Briefcase</option>
+        <option value="🏠">🏠 Home</option><option value="💡">💡 Idea</option>
+        <option value="🔧">🔧 Tools</option><option value="📞">📞 Phone</option>
+        <option value="💰">💰 Money</option><option value="🚀">🚀 Rocket</option>
+        <option value="❤️">❤️ Heart</option><option value="✅">✅ Check</option>
+        <option value="🎯">🎯 Target</option><option value="📋">📋 Clipboard</option>
+        <option value="🏢">🏢 Building</option>
+      </select>
+      <button onclick="addCategory()">+ Add Category</button>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM: Done + History -->
+<div class="bottom-section-title">📊 Done &amp; History</div>
+<div class="bottom-section">
+  <div class="bottom-card" id="done-col-card">
+    <h3>✓ Done <button class="clear-done-btn" onclick="clearDone()">clear all</button></h3>
+    <div class="done-task-list" id="done-list"></div>
+  </div>
+  <div class="bottom-card">
+    <h3>Monthly completions (last 6 months)</h3>
+    <div class="chart-wrap"><canvas id="monthly-chart"></canvas></div>
+  </div>
+  <div class="bottom-card">
+    <h3>Completed tasks log</h3>
+    <div class="log-list" id="log-list"></div>
+  </div>
+</div>
+
+<!-- Task Edit Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>Edit task</h2>
+    <label>Task</label>
+    <input type="text" id="edit-text" />
+    <label>Category</label>
+    <select id="edit-cat"></select>
+    <label>Priority</label>
+    <div class="edit-priority-btns">
+      <button class="priority-btn" id="epb-high" onclick="setEditPriority('high')">🔴 High</button>
+      <button class="priority-btn" id="epb-medium" onclick="setEditPriority('medium')">🟡 Medium</button>
+      <button class="priority-btn" id="epb-low" onclick="setEditPriority('low')">🟢 Low</button>
+    </div>
+    <label>Link URL <span style="font-size:10px;color:#aaa;">(optional)</span></label>
+    <input type="url" id="edit-url" placeholder="https://..." />
+    <div class="modal-actions">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="danger" onclick="deleteTask()">Delete</button>
+      <button class="confirm" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Category Edit Modal -->
+<div class="modal-overlay" id="cat-modal">
+  <div class="modal">
+    <h2>Edit category</h2>
+    <label>Name</label>
+    <input type="text" id="cat-edit-name" maxlength="30" />
+    <label>Icon</label>
+    <select id="cat-edit-icon">
+      <option value="📁">📁 Folder</option><option value="⭐">⭐ Star</option>
+      <option value="👤">👤 Person</option><option value="💼">💼 Briefcase</option>
+      <option value="🏠">🏠 Home</option><option value="💡">💡 Idea</option>
+      <option value="🔧">🔧 Tools</option><option value="📞">📞 Phone</option>
+      <option value="💰">💰 Money</option><option value="🚀">🚀 Rocket</option>
+      <option value="❤️">❤️ Heart</option><option value="✅">✅ Check</option>
+      <option value="🎯">🎯 Target</option><option value="📋">📋 Clipboard</option>
+      <option value="🏢">🏢 Building</option><option value="🚩">🚩 Flag</option>
+      <option value="💻">💻 Laptop</option><option value="₿">₿ Bitcoin</option>
+    </select>
+    <div class="modal-actions">
+      <button onclick="closeCatModal()">Cancel</button>
+      <button class="confirm" onclick="saveCatEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CAT_COLORS = {
+  'autoflag':  { bg: '#ede9fe', color: '#5b21b6' }, // purple
+  'cc':        { bg: '#fee2d5', color: '#c2410c' }, // deep orange
+  'finance':   { bg: '#fef3c7', color: '#b45309' }, // amber
+  'sv':        { bg: '#dbeafe', color: '#1d4ed8' }, // blue
+  'batm':      { bg: '#dcfce7', color: '#15803d' }, // green
+  'followup':  { bg: '#ccfbf1', color: '#0f766e' }, // teal
+  'home':      { bg: '#ffe4e6', color: '#be123c' }, // rose
+  'personal':  { bg: '#fae8ff', color: '#7e22ce' }, // violet
+  'trinity':   { bg: '#fff7ed', color: '#ea580c' }, // warm orange
+};
+const COLOR_PALETTE = [
+  { bg: '#ede9fe', color: '#5b21b6' },
+  { bg: '#fee2d5', color: '#c2410c' },
+  { bg: '#fef3c7', color: '#b45309' },
+  { bg: '#dbeafe', color: '#1d4ed8' },
+  { bg: '#dcfce7', color: '#15803d' },
+  { bg: '#ccfbf1', color: '#0f766e' },
+  { bg: '#ffe4e6', color: '#be123c' },
+  { bg: '#fae8ff', color: '#7e22ce' },
+  { bg: '#fff7ed', color: '#ea580c' },
+  { bg: '#ecfdf5', color: '#064e3b' },
+  { bg: '#eff6ff', color: '#1e3a8a' },
+  { bg: '#fdf4ff', color: '#86198f' },
+];
+const SYSTEM_COLS = ['pending', 'done'];
+
+const DEFAULT_CATEGORIES = [
+  { id: 'autoflag', label: 'AutoFlag', icon: '🚩' },
+  { id: 'cc', label: 'Computer Central', icon: '💻' },
+  { id: 'finance', label: 'Finance & Admin', icon: '💰' },
+  { id: 'sv', label: 'Sigler Ventures', icon: '🏢' },
+  { id: 'batm', label: 'BATM / Bitcoin', icon: '₿' },
+  { id: 'followup', label: 'Follow-ups', icon: '📋' },
+  { id: 'home', label: 'Home / Philinity', icon: '🏠' },
+  { id: 'personal', label: 'Personal', icon: '⭐' },
+  { id: 'trinity', label: 'Trinity', icon: '❤️' },
+];
+
+const DEFAULT_TASKS = [
+  { id: 1,  text: 'COB flag sheet → G-Sheets', cat: 'autoflag', col: 'autoflag', priority: 'high' },
+  { id: 2,  text: 'Fix COB install sheet', cat: 'autoflag', col: 'autoflag', priority: 'medium' },
+  { id: 3,  text: 'Update halyard lengths', cat: 'autoflag', col: 'autoflag', priority: 'medium' },
+  { id: 4,  text: 'Finish BOM in Odoo', cat: 'autoflag', col: 'autoflag', priority: 'high' },
+  { id: 5,  text: 'Team shirts (minuteman.com)', cat: 'autoflag', col: 'autoflag', priority: 'low' },
+  { id: 6,  text: 'Ring transfer / Cowboy RV Park', cat: 'cc', col: 'cc', priority: 'medium' },
+  { id: 7,  text: 'Backup/cancel Lightspeed', cat: 'cc', col: 'cc', priority: 'high' },
+  { id: 8,  text: 'Cancel QBO/Intuit', cat: 'cc', col: 'cc', priority: 'high' },
+  { id: 9,  text: 'Convert QB → Odoo', cat: 'cc', col: 'cc', priority: 'medium' },
+  { id: 10, text: 'Add Venmo/PayPal to Odoo', cat: 'finance', col: 'finance', priority: 'medium' },
+  { id: 11, text: 'SPS hazard insurance check', cat: 'finance', col: 'finance', priority: 'high' },
+  { id: 12, text: 'Send HOA invoices', cat: 'finance', col: 'finance', priority: 'high' },
+  { id: 13, text: 'Call Next — $500k workers comp', cat: 'finance', col: 'finance', priority: 'high' },
+  { id: 14, text: 'Contractors insurance/license', cat: 'sv', col: 'sv', priority: 'high' },
+  { id: 15, text: 'Finish Trinity contractor license', cat: 'sv', col: 'sv', priority: 'high' },
+  { id: 16, text: 'Check Avimor loan type', cat: 'sv', col: 'sv', priority: 'medium' },
+  { id: 17, text: 'FinCEN Cora', cat: 'batm', col: 'batm', priority: 'high' },
+  { id: 18, text: 'Bitcoin ATM Google Ads setup', cat: 'batm', col: 'batm', priority: 'medium' },
+  { id: 19, text: 'Amex dispute $5,170.50 (card 22055, filed 3/6/26)', cat: 'followup', col: 'followup', priority: 'high' },
+  { id: 20, text: 'Hot tub fix — send PO to Quintex EOM', cat: 'followup', col: 'followup', priority: 'medium' },
+  { id: 21, text: 'Rubber trim for closet door', cat: 'home', col: 'home', priority: 'low' },
+  { id: 22, text: '1" black trim guest bathroom', cat: 'home', col: 'home', priority: 'low' },
+  { id: 23, text: 'Guest bedroom ceiling fan', cat: 'home', col: 'home', priority: 'medium' },
+  { id: 24, text: 'Fix water drip master sink', cat: 'home', col: 'home', priority: 'medium' },
+  { id: 25, text: '14" tall planters for crops', cat: 'home', col: 'home', priority: 'low' },
+];
+
+let tasks = [], categories = [], completionLog = [], taskOrder = {};
+let nextId = 100, nextCatId = 50;
+let dragId = null, dragColId = null, editingId = null, editingCatId = null, chartInstance = null;
+let newTaskPriority = 'medium', editTaskPriority = 'medium';
+let catPanelOpen = false;
+
+function load() {
+  try {
+    tasks = JSON.parse(localStorage.getItem('phil-tasks-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_TASKS));
+    categories = JSON.parse(localStorage.getItem('phil-cats-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    completionLog = JSON.parse(localStorage.getItem('phil-log-v6') || '[]');
+    taskOrder = JSON.parse(localStorage.getItem('phil-taskorder-v6') || '{}');
+    nextId = parseInt(localStorage.getItem('phil-nextid-v6') || '100');
+    nextCatId = parseInt(localStorage.getItem('phil-nextcatid-v6') || '50');
+  } catch(e) {
+    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+    categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    completionLog = [];
+  }
+}
+
+function save() {
+  localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
+  localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
+  localStorage.setItem('phil-log-v6', JSON.stringify(completionLog));
+  localStorage.setItem('phil-taskorder-v6', JSON.stringify(taskOrder));
+  localStorage.setItem('phil-nextid-v6', nextId);
+  localStorage.setItem('phil-nextcatid-v6', nextCatId);
+  const el = document.getElementById('save-notice');
+  el.textContent = 'Saved ✓';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.textContent = '', 1500);
+}
+
+function getCatById(id) { return categories.find(c => c.id === id); }
+function getCatLabel(id) { return (getCatById(id) || {}).label || id; }
+function getCatIcon(id) { return (getCatById(id) || {}).icon || '📁'; }
+function getCatColor(id) {
+  if (CAT_COLORS[id]) return CAT_COLORS[id];
+  // For custom categories, assign from palette based on a stable hash of the id
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) & 0xffff;
+  return COLOR_PALETTE[hash % COLOR_PALETTE.length];
+}
+function getBadgeStyle(id) {
+  const c = getCatColor(id);
+  return `background:${c.bg};color:${c.color};`;
+}
+
+function updateStats() {
+  document.getElementById('s-total').textContent = tasks.length;
+  document.getElementById('s-done').textContent = tasks.filter(t => t.col === 'done').length;
+  document.getElementById('s-pending').textContent = tasks.filter(t => t.col === 'pending').length;
+  document.getElementById('s-alltime').textContent = completionLog.length;
+  document.getElementById('s-pct').textContent = tasks.length ? Math.round(tasks.filter(t => t.col === 'done').length / tasks.length * 100) + '%' : '0%';
+}
+
+function setNewPriority(p) {
+  newTaskPriority = p;
+  ['high','medium','low'].forEach(x => {
+    document.getElementById('pb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : '');
+  });
+}
+
+function setEditPriority(p) {
+  editTaskPriority = p;
+  ['high','medium','low'].forEach(x => {
+    document.getElementById('epb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : '');
+  });
+}
+
+function cyclePriority(taskId) {
+  const tk = tasks.find(t => t.id === taskId);
+  if (!tk) return;
+  const order = ['high','medium','low'];
+  tk.priority = order[(order.indexOf(tk.priority || 'medium') + 1) % 3];
+  save(); renderAll();
+}
+
+const P_ORDER = { high: 0, medium: 1, low: 2 };
+function sortTasks(arr, colId) {
+  const mode = document.getElementById('sort-select').value;
+  const copy = [...arr];
+  if (mode === 'manual') {
+    const order = taskOrder[colId] || [];
+    copy.sort((a, b) => {
+      const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
+      if (ai === -1 && bi === -1) return a.id - b.id;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  } else if (mode === 'priority') copy.sort((a,b) => P_ORDER[a.priority||'medium'] - P_ORDER[b.priority||'medium']);
+  else if (mode === 'priority-asc') copy.sort((a,b) => P_ORDER[b.priority||'medium'] - P_ORDER[a.priority||'medium']);
+  else if (mode === 'alpha') copy.sort((a,b) => a.text.localeCompare(b.text));
+  else copy.sort((a,b) => a.id - b.id);
+  return copy;
+}
+
+function toggleCatPanel() {
+  catPanelOpen = !catPanelOpen;
+  document.getElementById('cat-panel').classList.toggle('open', catPanelOpen);
+  document.querySelector('.manage-cats-btn').textContent = catPanelOpen ? '🗂 Manage Categories ▴' : '🗂 Manage Categories ▾';
+  if (catPanelOpen) renderCatList();
+}
+
+function renderCatList() {
+  document.getElementById('cat-list').innerHTML = categories.map(cat => {
+    const count = tasks.filter(t => t.col === cat.id).length;
+    return `<div class="cat-chip">
+      <span>${cat.icon}</span>
+      <span>${cat.label}</span>
+      <span class="chip-count">${count}</span>
+      <button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button>
+      <button class="chip-del" onclick="removeCategory('${cat.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+function addCategory() {
+  const name = document.getElementById('new-cat-name').value.trim();
+  const icon = document.getElementById('new-cat-icon').value;
+  if (!name) return;
+  const id = 'cat_' + (nextCatId++);
+  categories.push({ id, label: name, icon });
+  document.getElementById('new-cat-name').value = '';
+  save(); renderCatList(); rebuildCatSelects(); renderAll();
+}
+
+function removeCategory(id) {
+  const count = tasks.filter(t => t.col === id).length;
+  const msg = count > 0 ? `${count} task(s) in this category will move to Follow-ups. Delete anyway?` : 'Remove this category?';
+  if (!confirm(msg)) return;
+  tasks.forEach(t => { if (t.col === id) t.col = 'followup'; if (t.cat === id) t.cat = 'followup'; });
+  categories = categories.filter(c => c.id !== id);
+  save(); renderCatList(); rebuildCatSelects(); renderAll();
+}
+
+function openCatModal(id) {
+  editingCatId = id;
+  const cat = getCatById(id);
+  document.getElementById('cat-edit-name').value = cat.label;
+  document.getElementById('cat-edit-icon').value = cat.icon;
+  document.getElementById('cat-modal').classList.add('open');
+}
+function closeCatModal() { document.getElementById('cat-modal').classList.remove('open'); editingCatId = null; }
+function saveCatEdit() {
+  const cat = getCatById(editingCatId);
+  cat.label = document.getElementById('cat-edit-name').value.trim() || cat.label;
+  cat.icon = document.getElementById('cat-edit-icon').value;
+  closeCatModal(); save(); renderCatList(); rebuildCatSelects(); renderAll();
+}
+
+function rebuildCatSelects() {
+  ['new-task-cat','edit-cat'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+    if (cur && categories.find(c => c.id === cur)) sel.value = cur;
+  });
+}
+
+function moveTask(tk, targetColId) {
+  if (targetColId === 'done') {
+    if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
+    tk.col = 'done';
+  } else if (targetColId === 'pending') {
+    tk.col = 'pending';
+  } else {
+    tk.col = targetColId;
+    tk.cat = targetColId;
+  }
+}
+
+function renderAll() {
+  const wrap = document.getElementById('columns-wrap');
+  wrap.innerHTML = '';
+  const boardCols = [...categories, { id: 'pending', label: 'Pending', icon: '⏳' }];
+
+  boardCols.forEach(col => {
+    const colTasks = sortTasks(tasks.filter(t => t.col === col.id), col.id);
+    const isPending = col.id === 'pending';
+    const iconBg = isPending ? '#f3f4f6' : getCatColor(col.id).bg;
+    const div = document.createElement('div');
+    div.className = 'col';
+    div.dataset.col = col.id;
+    div.innerHTML = `
+      <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;"` : ''}>
+        <div class="col-icon" style="background:${iconBg}">${col.icon}</div>
+        <span class="col-title">${col.label}</span>
+        <span class="col-count">${colTasks.length}</span>
+      </div>
+      <div class="task-list" id="list-${col.id}">${colTasks.length === 0 ? '<div class="drop-hint">Drop here</div>' : ''}</div>`;
+    wrap.appendChild(div);
+
+    // Column header drag-to-reorder
+    if (!isPending) {
+      const header = div.querySelector('.col-header');
+      header.addEventListener('dragstart', e => {
+        dragColId = col.id;
+        dragId = null; // ensure task drag doesn't fire
+        e.dataTransfer.effectAllowed = 'move';
+        e.stopPropagation();
+        setTimeout(() => div.style.opacity = '0.5', 0);
+      });
+      header.addEventListener('dragend', () => {
+        div.style.opacity = '';
+        dragColId = null;
+        document.querySelectorAll('.col').forEach(c => c.classList.remove('col-drag-over'));
+      });
+    }
+
+    const list = div.querySelector('.task-list');
+    colTasks.forEach(task => {
+      const p = task.priority || 'medium';
+      const t = document.createElement('div');
+      t.className = 'task';
+      t.draggable = true;
+      t.dataset.id = task.id;
+      t.innerHTML = `
+        <div class="check"><svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div class="task-body">
+          <div style="display:flex;align-items:flex-start;gap:3px;">
+            <span class="task-text">${task.text}</span>
+            ${task.url ? `<a class="task-link" href="${task.url}" target="_blank" title="${task.url}" onclick="event.stopPropagation()"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
+          </div>
+          <div class="task-meta">
+            <span class="cat-badge" style="${getBadgeStyle(task.cat)}">${getCatIcon(task.cat)} ${getCatLabel(task.cat)}</span>
+            <span class="priority-pill p-${p}" title="Click to cycle priority">${p}</span>
+          </div>
+        </div>`;
+
+      t.querySelector('.check').addEventListener('click', e => {
+        e.stopPropagation();
+        const tk = tasks.find(x => x.id === task.id);
+        completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
+        tk.col = 'done';
+        save(); renderAll(); renderDone(); updateStats(); renderHistory();
+      });
+
+      t.querySelector('.priority-pill').addEventListener('click', e => {
+        e.stopPropagation();
+        cyclePriority(task.id);
+      });
+
+      t.querySelector('.task-text').addEventListener('dblclick', e => { e.stopPropagation(); openModal(task.id); });
+
+      t.addEventListener('dragstart', e => {
+        dragId = task.id;
+        dragColId = null;
+        setTimeout(() => t.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+        e.stopPropagation();
+      });
+      t.addEventListener('dragend', () => {
+        t.classList.remove('dragging');
+        document.querySelectorAll('.col').forEach(c => c.classList.remove('drag-over'));
+        document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
+      });
+
+      // Within-column reorder: dragover shows insertion line
+      if (document.getElementById('sort-select').value === 'manual') {
+        t.addEventListener('dragover', e => {
+          if (dragId === null || dragId === task.id || dragColId !== null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
+          const rect = t.getBoundingClientRect();
+          const mid = rect.top + rect.height / 2;
+          const line = document.createElement('div');
+          line.className = 'task-insert-line';
+          line.dataset.beforeId = e.clientY < mid ? task.id : '';
+          line.dataset.afterId = e.clientY >= mid ? task.id : '';
+          if (e.clientY < mid) t.before(line); else t.after(line);
+        });
+        t.addEventListener('drop', e => {
+          if (dragId === null || dragColId !== null) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const tk = tasks.find(x => x.id === dragId);
+          const rect = t.getBoundingClientRect();
+          const insertBefore = e.clientY < rect.top + rect.height / 2;
+          if (tk && tk.col === col.id) {
+            // reorder within column
+            reorderWithinCol(col.id, dragId, task.id, insertBefore);
+          } else if (tk) {
+            moveTask(tk, col.id);
+            // insert at position
+            reorderWithinCol(col.id, dragId, task.id, insertBefore);
+          }
+          document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
+          dragId = null;
+          save(); renderAll(); renderDone(); updateStats(); renderHistory();
+        });
+      }
+      list.appendChild(t);
+    });
+
+    div.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (dragColId !== null && dragColId !== col.id && !isPending) {
+        document.querySelectorAll('.col').forEach(c => c.classList.remove('col-drag-over'));
+        div.classList.add('col-drag-over');
+      } else if (dragId !== null) {
+        div.classList.add('drag-over');
+      }
+    });
+    div.addEventListener('dragleave', e => {
+      if (!div.contains(e.relatedTarget)) {
+        div.classList.remove('drag-over');
+        div.classList.remove('col-drag-over');
+      }
+    });
+    div.addEventListener('drop', e => {
+      e.preventDefault();
+      div.classList.remove('drag-over');
+      div.classList.remove('col-drag-over');
+      // Column reorder
+      if (dragColId !== null && dragColId !== col.id && !isPending) {
+        const fromIdx = categories.findIndex(c => c.id === dragColId);
+        const toIdx = categories.findIndex(c => c.id === col.id);
+        if (fromIdx !== -1 && toIdx !== -1) {
+          const [moved] = categories.splice(fromIdx, 1);
+          categories.splice(toIdx, 0, moved);
+          save();
+        }
+        dragColId = null;
+        renderAll(); renderDone(); updateStats(); renderHistory();
+      // Task drop
+      } else if (dragId !== null) {
+        const tk = tasks.find(x => x.id === dragId);
+        if (tk) { moveTask(tk, col.id); save(); }
+        dragId = null;
+        renderAll(); renderDone(); updateStats(); renderHistory();
+      }
+    });
+  });
+
+  // Done card as drop target
+  const doneCard = document.getElementById('done-col-card');
+  doneCard.ondragover = e => { e.preventDefault(); doneCard.style.outline = '2px dashed #4caf50'; };
+  doneCard.ondragleave = () => { doneCard.style.outline = ''; };
+  doneCard.ondrop = e => {
+    e.preventDefault(); doneCard.style.outline = '';
+    if (dragId !== null) {
+      const tk = tasks.find(x => x.id === dragId);
+      if (tk) { moveTask(tk, 'done'); save(); }
+      dragId = null; renderAll(); renderDone(); updateStats(); renderHistory();
+    }
+  };
+
+  updateStats();
+  renderDone();
+}
+
+function renderDone() {
+  const doneTasks = sortTasks(tasks.filter(t => t.col === 'done'));
+  const el = document.getElementById('done-list');
+  if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
+  el.innerHTML = doneTasks.map(task => `
+    <div class="done-item">
+      <button class="done-uncheck" onclick="undoneTask(${task.id})" title="Move back">
+        <svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div style="flex:1;min-width:0;">
+        <span class="done-text">${task.text}</span>
+        <div class="task-meta" style="margin-top:3px;">
+          <span class="cat-badge" style="${getBadgeStyle(task.cat)};font-size:9px;">${getCatLabel(task.cat)}</span>
+          <span class="priority-pill p-${task.priority||'medium'}" style="font-size:9px;">${task.priority||'medium'}</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function undoneTask(id) {
+  const tk = tasks.find(t => t.id === id);
+  if (!tk) return;
+  tk.col = tk.cat;
+  const idx = completionLog.findIndex(l => l.text === tk.text);
+  if (idx !== -1) completionLog.splice(idx, 1);
+  save(); renderAll(); renderDone(); updateStats(); renderHistory();
+}
+
+function renderHistory() {
+  const el = document.getElementById('log-list');
+  if (completionLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
+  else {
+    el.innerHTML = completionLog.slice(0, 60).map(l => {
+      const d = new Date(l.completedAt);
+      const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+      return `<div class="log-item"><span class="log-text">${l.text}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${getCatLabel(l.cat)}</span></div></div>`;
+    }).join('');
+  }
+
+  const ctx = document.getElementById('monthly-chart').getContext('2d');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  if (completionLog.length === 0) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.font = '12px -apple-system, sans-serif'; ctx.fillStyle = '#ccc'; ctx.textAlign = 'center';
+    ctx.fillText('Complete tasks to see data', ctx.canvas.width / 2, 100);
+    return;
+  }
+  const months = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), count: 0 });
+  }
+  completionLog.forEach(l => {
+    const d = new Date(l.completedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const m = months.find(x => x.key === key);
+    if (m) m.count++;
+  });
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: months.map(m => m.label), datasets: [{ data: months.map(m => m.count), backgroundColor: months.map((_,i) => i === months.length-1 ? '#6366f1' : '#c7d2fe'), borderRadius: 6, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} completed` } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f0ede6' } }, x: { ticks: { font: { size: 11 } }, grid: { display: false } } } }
+  });
+}
+
+function reorderWithinCol(colId, movedId, targetId, insertBefore) {
+  // Build current order for this column
+  const colTaskIds = (taskOrder[colId] || tasks.filter(t => t.col === colId).map(t => t.id));
+  const all = [...new Set([...colTaskIds, ...tasks.filter(t => t.col === colId).map(t => t.id)])];
+  const filtered = all.filter(id => id !== movedId);
+  const targetIdx = filtered.indexOf(targetId);
+  if (targetIdx === -1) { filtered.push(movedId); }
+  else if (insertBefore) { filtered.splice(targetIdx, 0, movedId); }
+  else { filtered.splice(targetIdx + 1, 0, movedId); }
+  taskOrder[colId] = filtered;
+}
+
+function addTask() {
+  const text = document.getElementById('new-task-text').value.trim();
+  const cat = document.getElementById('new-task-cat').value;
+  if (!text) return;
+  const newTask = { id: nextId++, text, cat, col: cat, priority: newTaskPriority };
+  tasks.push(newTask);
+  // prepend to manual order for that col
+  if (!taskOrder[cat]) taskOrder[cat] = [];
+  taskOrder[cat].unshift(newTask.id);
+  document.getElementById('new-task-text').value = '';
+  save(); renderAll(); updateStats();
+}
+
+document.getElementById('new-task-text').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
+
+function clearDone() {
+  if (!confirm('Remove all tasks from Done?')) return;
+  tasks = tasks.filter(t => t.col !== 'done');
+  save(); renderAll(); renderDone(); updateStats();
+}
+
+function openModal(id) {
+  editingId = id;
+  const task = tasks.find(t => t.id === id);
+  document.getElementById('edit-text').value = task.text;
+  document.getElementById('edit-url').value = task.url || '';
+  rebuildCatSelects();
+  document.getElementById('edit-cat').value = task.cat;
+  editTaskPriority = task.priority || 'medium';
+  setEditPriority(editTaskPriority);
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); editingId = null; }
+function saveEdit() {
+  const tk = tasks.find(t => t.id === editingId);
+  const newCat = document.getElementById('edit-cat').value;
+  tk.text = document.getElementById('edit-text').value.trim() || tk.text;
+  tk.priority = editTaskPriority;
+  tk.cat = newCat;
+  tk.url = document.getElementById('edit-url').value.trim() || '';
+  if (!SYSTEM_COLS.includes(tk.col) && tk.col !== 'pending') tk.col = newCat;
+  closeModal(); save(); renderAll(); updateStats();
+}
+function deleteTask() {
+  if (!confirm('Delete this task?')) return;
+  tasks = tasks.filter(t => t.id !== editingId);
+  closeModal(); save(); renderAll(); updateStats();
+}
+
+document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
+document.getElementById('cat-modal').addEventListener('click', e => { if (e.target === document.getElementById('cat-modal')) closeCatModal(); });
+
+function exportData() {
+  const data = {
+    version: 'philinity-v6',
+    exportedAt: new Date().toISOString(),
+    tasks,
+    categories,
+    completionLog,
+    taskOrder,
+    nextId,
+    nextCatId
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = `philinity-tasks-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  const el = document.getElementById('save-notice');
+  el.textContent = `Exported philinity-tasks-${date}.json ✓`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.textContent = '', 3000);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.tasks || !data.categories) throw new Error('Invalid file');
+      if (!confirm(`Import "${file.name}"? This will replace your current board data.`)) return;
+      tasks = data.tasks;
+      categories = data.categories;
+      completionLog = data.completionLog || [];
+      taskOrder = data.taskOrder || {};
+      nextId = data.nextId || 100;
+      nextCatId = data.nextCatId || 50;
+      save();
+      rebuildCatSelects();
+      renderAll();
+      renderHistory();
+      const el = document.getElementById('save-notice');
+      el.textContent = `Imported "${file.name}" ✓`;
+      clearTimeout(el._t);
+      el._t = setTimeout(() => el.textContent = '', 3000);
+    } catch(err) {
+      alert('Could not read file. Make sure it\'s a valid Philinity export.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
+</script>
+</body>
+</html>
