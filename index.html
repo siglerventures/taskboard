@@ -25,17 +25,14 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const dataRef = ref(db, 'philinity');
 
-// Expose to global scope for the rest of the script
 window._fbRef = dataRef;
 window._fbSet = set;
 window._fbOnValue = onValue;
 window._fbReady = true;
 
-// Listen for real-time changes from Firebase
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
-  // Only update if data changed externally (not from our own save)
   if (window._suppressListener) return;
   tasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
   categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
@@ -102,7 +99,7 @@ onValue(dataRef, (snapshot) => {
   .drop-hint { font-size: 11px; color: #bbb; text-align: center; padding: 14px 6px; border: 1px dashed #ddd; border-radius: 8px; }
   .task-insert-line { height: 3px; background: #6366f1; border-radius: 2px; margin: 2px 0; }
 
-  /* Mid section: manage cats + stats */
+  /* Mid section */
   .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
   .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #f4f3ee; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
@@ -111,8 +108,6 @@ onValue(dataRef, (snapshot) => {
   .stat { background: #f4f3ee; border-radius: 10px; padding: 0.5rem 0.9rem; min-width: 65px; }
   .stat-num { font-size: 20px; font-weight: 600; }
   .stat-label { font-size: 10px; color: #888; margin-top: 1px; }
-
-  /* Manage cats dropdown */
   .cat-panel { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 0.5px solid #f0ede6; }
   .cat-panel.open { display: block; }
   .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -123,8 +118,7 @@ onValue(dataRef, (snapshot) => {
   .cat-chip .chip-del { cursor: pointer; color: #ccc; font-size: 15px; line-height: 1; border: none; background: none; padding: 0; }
   .cat-chip .chip-del:hover { color: #e53e3e; }
   .add-cat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .add-cat-row input { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
-  .add-cat-row select { padding: 6px 9px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
+  .add-cat-row input[type="text"] { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
   .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; cursor: pointer; }
 
   /* Bottom section */
@@ -165,6 +159,8 @@ onValue(dataRef, (snapshot) => {
   .ctx-submenu.open { display: block; }
   .ctx-overlay { display: none; position: fixed; inset: 0; z-index: 199; }
   .ctx-overlay.open { display: block; }
+
+  /* Modals */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
   .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; }
@@ -181,7 +177,7 @@ onValue(dataRef, (snapshot) => {
 </head>
 <body>
 
-<!-- TOP: title + new task + sort -->
+<!-- TOP BAR -->
 <div class="top-bar">
   <h1>📋 Philinity's Task Board</h1>
   <input type="text" id="new-task-text" placeholder="New task..." />
@@ -201,8 +197,8 @@ onValue(dataRef, (snapshot) => {
     <option value="added">Date added</option>
   </select>
   <div style="display:flex;gap:6px;margin-left:auto;flex-shrink:0;">
-    <button onclick="exportData()" title="Export backup JSON" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">⬇ Export</button>
-    <button onclick="document.getElementById('import-input').click()" title="Import backup JSON" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">⬆ Import</button>
+    <button onclick="exportData()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">⬇ Export</button>
+    <button onclick="document.getElementById('import-input').click()" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">⬆ Import</button>
   </div>
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
 </div>
@@ -211,7 +207,7 @@ onValue(dataRef, (snapshot) => {
 <!-- BOARD -->
 <div class="columns-wrap" id="columns-wrap"></div>
 
-<!-- MID: Manage Categories + Stats -->
+<!-- MID: Stats + Manage Categories -->
 <div class="mid-section">
   <div class="mid-row">
     <button class="manage-cats-btn" onclick="toggleCatPanel()">🗂 Manage Categories ▾</button>
@@ -227,16 +223,7 @@ onValue(dataRef, (snapshot) => {
     <div class="cat-list" id="cat-list"></div>
     <div class="add-cat-row">
       <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
-      <select id="new-cat-icon">
-        <option value="📁">📁 Folder</option><option value="⭐">⭐ Star</option>
-        <option value="👤">👤 Person</option><option value="💼">💼 Briefcase</option>
-        <option value="🏠">🏠 Home</option><option value="💡">💡 Idea</option>
-        <option value="🔧">🔧 Tools</option><option value="📞">📞 Phone</option>
-        <option value="💰">💰 Money</option><option value="🚀">🚀 Rocket</option>
-        <option value="❤️">❤️ Heart</option><option value="✅">✅ Check</option>
-        <option value="🎯">🎯 Target</option><option value="📋">📋 Clipboard</option>
-        <option value="🏢">🏢 Building</option>
-      </select>
+      <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #ddd;border-radius:8px;background:#fff;" title="Type or paste any emoji" />
       <button onclick="addCategory()">+ Add Category</button>
     </div>
   </div>
@@ -305,18 +292,8 @@ onValue(dataRef, (snapshot) => {
     <h2>Edit category</h2>
     <label>Name</label>
     <input type="text" id="cat-edit-name" maxlength="30" />
-    <label>Icon</label>
-    <select id="cat-edit-icon">
-      <option value="📁">📁 Folder</option><option value="⭐">⭐ Star</option>
-      <option value="👤">👤 Person</option><option value="💼">💼 Briefcase</option>
-      <option value="🏠">🏠 Home</option><option value="💡">💡 Idea</option>
-      <option value="🔧">🔧 Tools</option><option value="📞">📞 Phone</option>
-      <option value="💰">💰 Money</option><option value="🚀">🚀 Rocket</option>
-      <option value="❤️">❤️ Heart</option><option value="✅">✅ Check</option>
-      <option value="🎯">🎯 Target</option><option value="📋">📋 Clipboard</option>
-      <option value="🏢">🏢 Building</option><option value="🚩">🚩 Flag</option>
-      <option value="💻">💻 Laptop</option><option value="₿">₿ Bitcoin</option>
-    </select>
+    <label>Icon <span style="font-size:10px;color:#aaa;">— type or paste any emoji</span></label>
+    <input type="text" id="cat-edit-icon" maxlength="2" style="width:60px;text-align:center;font-size:22px;padding:6px 2px;border:0.5px solid #ddd;border-radius:8px;" />
     <div class="modal-actions">
       <button onclick="closeCatModal()">Cancel</button>
       <button class="confirm" onclick="saveCatEdit()">Save</button>
@@ -326,29 +303,23 @@ onValue(dataRef, (snapshot) => {
 
 <script>
 const CAT_COLORS = {
-  'autoflag':  { bg: '#ede9fe', color: '#5b21b6' }, // purple
-  'cc':        { bg: '#fee2d5', color: '#c2410c' }, // deep orange
-  'finance':   { bg: '#fef3c7', color: '#b45309' }, // amber
-  'sv':        { bg: '#dbeafe', color: '#1d4ed8' }, // blue
-  'batm':      { bg: '#dcfce7', color: '#15803d' }, // green
-  'followup':  { bg: '#ccfbf1', color: '#0f766e' }, // teal
-  'home':      { bg: '#ffe4e6', color: '#be123c' }, // rose
-  'personal':  { bg: '#fae8ff', color: '#7e22ce' }, // violet
-  'trinity':   { bg: '#fff7ed', color: '#ea580c' }, // warm orange
+  'autoflag': { bg: '#ede9fe', color: '#5b21b6' },
+  'cc':       { bg: '#fee2d5', color: '#c2410c' },
+  'finance':  { bg: '#fef3c7', color: '#b45309' },
+  'sv':       { bg: '#dbeafe', color: '#1d4ed8' },
+  'batm':     { bg: '#dcfce7', color: '#15803d' },
+  'followup': { bg: '#ccfbf1', color: '#0f766e' },
+  'home':     { bg: '#ffe4e6', color: '#be123c' },
+  'personal': { bg: '#fae8ff', color: '#7e22ce' },
+  'trinity':  { bg: '#fff7ed', color: '#ea580c' },
 };
 const COLOR_PALETTE = [
-  { bg: '#ede9fe', color: '#5b21b6' },
-  { bg: '#fee2d5', color: '#c2410c' },
-  { bg: '#fef3c7', color: '#b45309' },
-  { bg: '#dbeafe', color: '#1d4ed8' },
-  { bg: '#dcfce7', color: '#15803d' },
-  { bg: '#ccfbf1', color: '#0f766e' },
-  { bg: '#ffe4e6', color: '#be123c' },
-  { bg: '#fae8ff', color: '#7e22ce' },
-  { bg: '#fff7ed', color: '#ea580c' },
-  { bg: '#ecfdf5', color: '#064e3b' },
-  { bg: '#eff6ff', color: '#1e3a8a' },
-  { bg: '#fdf4ff', color: '#86198f' },
+  { bg: '#ede9fe', color: '#5b21b6' },{ bg: '#fee2d5', color: '#c2410c' },
+  { bg: '#fef3c7', color: '#b45309' },{ bg: '#dbeafe', color: '#1d4ed8' },
+  { bg: '#dcfce7', color: '#15803d' },{ bg: '#ccfbf1', color: '#0f766e' },
+  { bg: '#ffe4e6', color: '#be123c' },{ bg: '#fae8ff', color: '#7e22ce' },
+  { bg: '#fff7ed', color: '#ea580c' },{ bg: '#ecfdf5', color: '#064e3b' },
+  { bg: '#eff6ff', color: '#1e3a8a' },{ bg: '#fdf4ff', color: '#86198f' },
 ];
 const SYSTEM_COLS = ['pending', 'done'];
 
@@ -399,7 +370,6 @@ let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false;
 
 function load() {
-  // Load from localStorage as initial fallback while Firebase connects
   try {
     tasks = JSON.parse(localStorage.getItem('phil-tasks-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_TASKS));
     categories = JSON.parse(localStorage.getItem('phil-cats-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
@@ -422,22 +392,16 @@ function showSyncNotice(msg) {
 }
 
 function save() {
-  // Save to localStorage as backup
   localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
   localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
   localStorage.setItem('phil-log-v6', JSON.stringify(completionLog));
   localStorage.setItem('phil-taskorder-v6', JSON.stringify(taskOrder));
   localStorage.setItem('phil-nextid-v6', nextId);
   localStorage.setItem('phil-nextcatid-v6', nextCatId);
-
-  // Save to Firebase
   if (window._fbRef && window._fbSet) {
     window._suppressListener = true;
     window._fbSet(window._fbRef, { tasks, categories, completionLog, taskOrder, nextId, nextCatId })
-      .then(() => {
-        showSyncNotice('Saved ☁️ ✓');
-        setTimeout(() => window._suppressListener = false, 1000);
-      })
+      .then(() => { showSyncNotice('Saved ☁️ ✓'); setTimeout(() => window._suppressListener = false, 1000); })
       .catch(() => showSyncNotice('Saved locally ✓'));
   } else {
     showSyncNotice('Saved locally ✓');
@@ -449,15 +413,11 @@ function getCatLabel(id) { return (getCatById(id) || {}).label || id; }
 function getCatIcon(id) { return (getCatById(id) || {}).icon || '📁'; }
 function getCatColor(id) {
   if (CAT_COLORS[id]) return CAT_COLORS[id];
-  // For custom categories, assign from palette based on a stable hash of the id
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) & 0xffff;
   return COLOR_PALETTE[hash % COLOR_PALETTE.length];
 }
-function getBadgeStyle(id) {
-  const c = getCatColor(id);
-  return `background:${c.bg};color:${c.color};`;
-}
+function getBadgeStyle(id) { const c = getCatColor(id); return `background:${c.bg};color:${c.color};`; }
 
 function updateStats() {
   document.getElementById('s-total').textContent = tasks.length;
@@ -469,18 +429,12 @@ function updateStats() {
 
 function setNewPriority(p) {
   newTaskPriority = p;
-  ['high','medium','low'].forEach(x => {
-    document.getElementById('pb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : '');
-  });
+  ['high','medium','low'].forEach(x => { document.getElementById('pb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : ''); });
 }
-
 function setEditPriority(p) {
   editTaskPriority = p;
-  ['high','medium','low'].forEach(x => {
-    document.getElementById('epb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : '');
-  });
+  ['high','medium','low'].forEach(x => { document.getElementById('epb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : ''); });
 }
-
 function cyclePriority(taskId) {
   const tk = tasks.find(t => t.id === taskId);
   if (!tk) return;
@@ -498,8 +452,7 @@ function sortTasks(arr, colId) {
     copy.sort((a, b) => {
       const ai = order.indexOf(a.id), bi = order.indexOf(b.id);
       if (ai === -1 && bi === -1) return a.id - b.id;
-      if (ai === -1) return 1;
-      if (bi === -1) return -1;
+      if (ai === -1) return 1; if (bi === -1) return -1;
       return ai - bi;
     });
   } else if (mode === 'priority') copy.sort((a,b) => P_ORDER[a.priority||'medium'] - P_ORDER[b.priority||'medium']);
@@ -515,39 +468,30 @@ function toggleCatPanel() {
   document.querySelector('.manage-cats-btn').textContent = catPanelOpen ? '🗂 Manage Categories ▴' : '🗂 Manage Categories ▾';
   if (catPanelOpen) renderCatList();
 }
-
 function renderCatList() {
   document.getElementById('cat-list').innerHTML = categories.map(cat => {
     const count = tasks.filter(t => t.col === cat.id).length;
-    return `<div class="cat-chip">
-      <span>${cat.icon}</span>
-      <span>${cat.label}</span>
-      <span class="chip-count">${count}</span>
-      <button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button>
-      <button class="chip-del" onclick="removeCategory('${cat.id}')">×</button>
-    </div>`;
+    return `<div class="cat-chip"><span>${cat.icon}</span><span>${cat.label}</span><span class="chip-count">${count}</span><button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button><button class="chip-del" onclick="removeCategory('${cat.id}')">×</button></div>`;
   }).join('');
 }
-
 function addCategory() {
   const name = document.getElementById('new-cat-name').value.trim();
-  const icon = document.getElementById('new-cat-icon').value;
+  const icon = document.getElementById('new-cat-icon').value.trim() || '📁';
   if (!name) return;
   const id = 'cat_' + (nextCatId++);
   categories.push({ id, label: name, icon });
   document.getElementById('new-cat-name').value = '';
+  document.getElementById('new-cat-icon').value = '📁';
   save(); renderCatList(); rebuildCatSelects(); renderAll();
 }
-
 function removeCategory(id) {
   const count = tasks.filter(t => t.col === id).length;
-  const msg = count > 0 ? `${count} task(s) in this category will move to Follow-ups. Delete anyway?` : 'Remove this category?';
+  const msg = count > 0 ? `${count} task(s) will move to Follow-ups. Delete anyway?` : 'Remove this category?';
   if (!confirm(msg)) return;
   tasks.forEach(t => { if (t.col === id) t.col = 'followup'; if (t.cat === id) t.cat = 'followup'; });
   categories = categories.filter(c => c.id !== id);
   save(); renderCatList(); rebuildCatSelects(); renderAll();
 }
-
 function openCatModal(id) {
   editingCatId = id;
   const cat = getCatById(id);
@@ -559,10 +503,9 @@ function closeCatModal() { document.getElementById('cat-modal').classList.remove
 function saveCatEdit() {
   const cat = getCatById(editingCatId);
   cat.label = document.getElementById('cat-edit-name').value.trim() || cat.label;
-  cat.icon = document.getElementById('cat-edit-icon').value;
+  cat.icon = document.getElementById('cat-edit-icon').value.trim() || cat.icon;
   closeCatModal(); save(); renderCatList(); rebuildCatSelects(); renderAll();
 }
-
 function rebuildCatSelects() {
   ['new-task-cat','edit-cat'].forEach(id => {
     const sel = document.getElementById(id);
@@ -580,9 +523,19 @@ function moveTask(tk, targetColId) {
   } else if (targetColId === 'pending') {
     tk.col = 'pending';
   } else {
-    tk.col = targetColId;
-    tk.cat = targetColId;
+    tk.col = targetColId; tk.cat = targetColId;
   }
+}
+
+function reorderWithinCol(colId, movedId, targetId, insertBefore) {
+  const colTaskIds = (taskOrder[colId] || tasks.filter(t => t.col === colId).map(t => t.id));
+  const all = [...new Set([...colTaskIds, ...tasks.filter(t => t.col === colId).map(t => t.id)])];
+  const filtered = all.filter(id => id !== movedId);
+  const targetIdx = filtered.indexOf(targetId);
+  if (targetIdx === -1) filtered.push(movedId);
+  else if (insertBefore) filtered.splice(targetIdx, 0, movedId);
+  else filtered.splice(targetIdx + 1, 0, movedId);
+  taskOrder[colId] = filtered;
 }
 
 function renderAll() {
@@ -606,19 +559,15 @@ function renderAll() {
       <div class="task-list" id="list-${col.id}">${colTasks.length === 0 ? '<div class="drop-hint">Drop here</div>' : ''}</div>`;
     wrap.appendChild(div);
 
-    // Column header drag-to-reorder
     if (!isPending) {
       const header = div.querySelector('.col-header');
       header.addEventListener('dragstart', e => {
-        dragColId = col.id;
-        dragId = null; // ensure task drag doesn't fire
-        e.dataTransfer.effectAllowed = 'move';
-        e.stopPropagation();
+        dragColId = col.id; dragId = null;
+        e.dataTransfer.effectAllowed = 'move'; e.stopPropagation();
         setTimeout(() => div.style.opacity = '0.5', 0);
       });
       header.addEventListener('dragend', () => {
-        div.style.opacity = '';
-        dragColId = null;
+        div.style.opacity = ''; dragColId = null;
         document.querySelectorAll('.col').forEach(c => c.classList.remove('col-drag-over'));
       });
     }
@@ -627,9 +576,7 @@ function renderAll() {
     colTasks.forEach(task => {
       const p = task.priority || 'medium';
       const t = document.createElement('div');
-      t.className = 'task';
-      t.draggable = true;
-      t.dataset.id = task.id;
+      t.className = 'task'; t.draggable = true; t.dataset.id = task.id;
       t.innerHTML = `
         <div class="check"><svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <div class="task-body">
@@ -650,15 +597,10 @@ function renderAll() {
         tk.col = 'done';
         save(); renderAll(); renderDone(); updateStats(); renderHistory();
       });
-
-      t.querySelector('.priority-pill').addEventListener('click', e => {
-        e.stopPropagation();
-        cyclePriority(task.id);
-      });
-
+      t.querySelector('.priority-pill').addEventListener('click', e => { e.stopPropagation(); cyclePriority(task.id); });
       t.querySelector('.task-text').addEventListener('dblclick', e => { e.stopPropagation(); openModal(task.id); });
 
-      // Right-click (desktop) + long-press / tap (mobile) context menu
+      // Right-click (desktop) + long-press (mobile) context menu
       t.addEventListener('contextmenu', e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, task.id); });
       let tapTimer = null;
       t.addEventListener('touchstart', e => {
@@ -668,11 +610,9 @@ function renderAll() {
       t.addEventListener('touchmove', () => { if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; } });
 
       t.addEventListener('dragstart', e => {
-        dragId = task.id;
-        dragColId = null;
+        dragId = task.id; dragColId = null;
         setTimeout(() => t.classList.add('dragging'), 0);
-        e.dataTransfer.effectAllowed = 'move';
-        e.stopPropagation();
+        e.dataTransfer.effectAllowed = 'move'; e.stopPropagation();
       });
       t.addEventListener('dragend', () => {
         t.classList.remove('dragging');
@@ -680,36 +620,24 @@ function renderAll() {
         document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
       });
 
-      // Within-column reorder: dragover shows insertion line
       if (document.getElementById('sort-select').value === 'manual') {
         t.addEventListener('dragover', e => {
           if (dragId === null || dragId === task.id || dragColId !== null) return;
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
           const rect = t.getBoundingClientRect();
-          const mid = rect.top + rect.height / 2;
           const line = document.createElement('div');
           line.className = 'task-insert-line';
-          line.dataset.beforeId = e.clientY < mid ? task.id : '';
-          line.dataset.afterId = e.clientY >= mid ? task.id : '';
-          if (e.clientY < mid) t.before(line); else t.after(line);
+          if (e.clientY < rect.top + rect.height / 2) t.before(line); else t.after(line);
         });
         t.addEventListener('drop', e => {
           if (dragId === null || dragColId !== null) return;
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           const tk = tasks.find(x => x.id === dragId);
           const rect = t.getBoundingClientRect();
           const insertBefore = e.clientY < rect.top + rect.height / 2;
-          if (tk && tk.col === col.id) {
-            // reorder within column
-            reorderWithinCol(col.id, dragId, task.id, insertBefore);
-          } else if (tk) {
-            moveTask(tk, col.id);
-            // insert at position
-            reorderWithinCol(col.id, dragId, task.id, insertBefore);
-          }
+          if (tk && tk.col === col.id) reorderWithinCol(col.id, dragId, task.id, insertBefore);
+          else if (tk) { moveTask(tk, col.id); reorderWithinCol(col.id, dragId, task.id, insertBefore); }
           document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
           dragId = null;
           save(); renderAll(); renderDone(); updateStats(); renderHistory();
@@ -723,42 +651,26 @@ function renderAll() {
       if (dragColId !== null && dragColId !== col.id && !isPending) {
         document.querySelectorAll('.col').forEach(c => c.classList.remove('col-drag-over'));
         div.classList.add('col-drag-over');
-      } else if (dragId !== null) {
-        div.classList.add('drag-over');
-      }
+      } else if (dragId !== null) div.classList.add('drag-over');
     });
     div.addEventListener('dragleave', e => {
-      if (!div.contains(e.relatedTarget)) {
-        div.classList.remove('drag-over');
-        div.classList.remove('col-drag-over');
-      }
+      if (!div.contains(e.relatedTarget)) { div.classList.remove('drag-over'); div.classList.remove('col-drag-over'); }
     });
     div.addEventListener('drop', e => {
-      e.preventDefault();
-      div.classList.remove('drag-over');
-      div.classList.remove('col-drag-over');
-      // Column reorder
+      e.preventDefault(); div.classList.remove('drag-over'); div.classList.remove('col-drag-over');
       if (dragColId !== null && dragColId !== col.id && !isPending) {
         const fromIdx = categories.findIndex(c => c.id === dragColId);
         const toIdx = categories.findIndex(c => c.id === col.id);
-        if (fromIdx !== -1 && toIdx !== -1) {
-          const [moved] = categories.splice(fromIdx, 1);
-          categories.splice(toIdx, 0, moved);
-          save();
-        }
-        dragColId = null;
-        renderAll(); renderDone(); updateStats(); renderHistory();
-      // Task drop
+        if (fromIdx !== -1 && toIdx !== -1) { const [moved] = categories.splice(fromIdx, 1); categories.splice(toIdx, 0, moved); save(); }
+        dragColId = null; renderAll(); renderDone(); updateStats(); renderHistory();
       } else if (dragId !== null) {
         const tk = tasks.find(x => x.id === dragId);
         if (tk) { moveTask(tk, col.id); save(); }
-        dragId = null;
-        renderAll(); renderDone(); updateStats(); renderHistory();
+        dragId = null; renderAll(); renderDone(); updateStats(); renderHistory();
       }
     });
   });
 
-  // Done card as drop target
   const doneCard = document.getElementById('done-col-card');
   doneCard.ondragover = e => { e.preventDefault(); doneCard.style.outline = '2px dashed #4caf50'; };
   doneCard.ondragleave = () => { doneCard.style.outline = ''; };
@@ -771,12 +683,11 @@ function renderAll() {
     }
   };
 
-  updateStats();
-  renderDone();
+  updateStats(); renderDone();
 }
 
 function renderDone() {
-  const doneTasks = sortTasks(tasks.filter(t => t.col === 'done'));
+  const doneTasks = sortTasks(tasks.filter(t => t.col === 'done'), 'done');
   const el = document.getElementById('done-list');
   if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
   el.innerHTML = doneTasks.map(task => `
@@ -813,7 +724,6 @@ function renderHistory() {
       return `<div class="log-item"><span class="log-text">${l.text}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${getCatLabel(l.cat)}</span></div></div>`;
     }).join('');
   }
-
   const ctx = document.getElementById('monthly-chart').getContext('2d');
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
   if (completionLog.length === 0) {
@@ -841,25 +751,12 @@ function renderHistory() {
   });
 }
 
-function reorderWithinCol(colId, movedId, targetId, insertBefore) {
-  // Build current order for this column
-  const colTaskIds = (taskOrder[colId] || tasks.filter(t => t.col === colId).map(t => t.id));
-  const all = [...new Set([...colTaskIds, ...tasks.filter(t => t.col === colId).map(t => t.id)])];
-  const filtered = all.filter(id => id !== movedId);
-  const targetIdx = filtered.indexOf(targetId);
-  if (targetIdx === -1) { filtered.push(movedId); }
-  else if (insertBefore) { filtered.splice(targetIdx, 0, movedId); }
-  else { filtered.splice(targetIdx + 1, 0, movedId); }
-  taskOrder[colId] = filtered;
-}
-
 function addTask() {
   const text = document.getElementById('new-task-text').value.trim();
   const cat = document.getElementById('new-task-cat').value;
   if (!text) return;
   const newTask = { id: nextId++, text, cat, col: cat, priority: newTaskPriority };
   tasks.push(newTask);
-  // prepend to manual order for that col
   if (!taskOrder[cat]) taskOrder[cat] = [];
   taskOrder[cat].unshift(newTask.id);
   document.getElementById('new-task-text').value = '';
@@ -906,28 +803,14 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target =
 document.getElementById('cat-modal').addEventListener('click', e => { if (e.target === document.getElementById('cat-modal')) closeCatModal(); });
 
 function exportData() {
-  const data = {
-    version: 'philinity-v6',
-    exportedAt: new Date().toISOString(),
-    tasks,
-    categories,
-    completionLog,
-    taskOrder,
-    nextId,
-    nextCatId
-  };
+  const data = { version: 'philinity-v6', exportedAt: new Date().toISOString(), tasks, categories, completionLog, taskOrder, nextId, nextCatId };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   const date = new Date().toISOString().slice(0,10);
-  a.href = url;
-  a.download = `philinity-tasks-${date}.json`;
-  a.click();
+  a.href = url; a.download = `philinity-tasks-${date}.json`; a.click();
   URL.revokeObjectURL(url);
-  const el = document.getElementById('save-notice');
-  el.textContent = `Exported philinity-tasks-${date}.json ✓`;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.textContent = '', 3000);
+  showSyncNotice(`Exported philinity-tasks-${date}.json ✓`);
 }
 
 function importData(event) {
@@ -939,23 +822,12 @@ function importData(event) {
       const data = JSON.parse(e.target.result);
       if (!data.tasks || !data.categories) throw new Error('Invalid file');
       if (!confirm(`Import "${file.name}"? This will replace your current board data.`)) return;
-      tasks = data.tasks;
-      categories = data.categories;
-      completionLog = data.completionLog || [];
-      taskOrder = data.taskOrder || {};
-      nextId = data.nextId || 100;
-      nextCatId = data.nextCatId || 50;
-      save();
-      rebuildCatSelects();
-      renderAll();
-      renderHistory();
-      const el = document.getElementById('save-notice');
-      el.textContent = `Imported "${file.name}" ✓`;
-      clearTimeout(el._t);
-      el._t = setTimeout(() => el.textContent = '', 3000);
-    } catch(err) {
-      alert('Could not read file. Make sure it\'s a valid Philinity export.');
-    }
+      tasks = data.tasks; categories = data.categories;
+      completionLog = data.completionLog || []; taskOrder = data.taskOrder || {};
+      nextId = data.nextId || 100; nextCatId = data.nextCatId || 50;
+      save(); rebuildCatSelects(); renderAll(); renderHistory();
+      showSyncNotice(`Imported "${file.name}" ✓`);
+    } catch(err) { alert('Could not read file. Make sure it\'s a valid Philinity export.'); }
   };
   reader.readAsText(file);
   event.target.value = '';
@@ -968,51 +840,36 @@ function openCtxMenu(x, y, taskId) {
   ctxTaskId = taskId;
   const tk = tasks.find(t => t.id === taskId);
   document.getElementById('ctx-title').textContent = tk.text.length > 30 ? tk.text.slice(0, 30) + '…' : tk.text;
-
-  // Build category submenu
   const sub = document.getElementById('ctx-submenu');
-  sub.innerHTML = categories.map(cat => `
-    <div class="ctx-item" onclick="ctxMoveTo('${cat.id}')">
-      <span class="ctx-icon">${cat.icon}</span> ${cat.label}
-    </div>`).join('');
+  sub.innerHTML = categories.map(cat => `<div class="ctx-item" onclick="ctxMoveTo('${cat.id}')"><span class="ctx-icon">${cat.icon}</span> ${cat.label}</div>`).join('');
   sub.classList.remove('open');
-
-  // Position menu — keep it on screen
   const menu = document.getElementById('ctx-menu');
   menu.classList.add('open');
   document.getElementById('ctx-overlay').classList.add('open');
-
   const mw = 220, mh = 280;
   const left = x + mw > window.innerWidth ? window.innerWidth - mw - 8 : x;
   const top = y + mh > window.innerHeight ? window.innerHeight - mh - 8 : y;
-  menu.style.left = left + 'px';
-  menu.style.top = top + 'px';
+  menu.style.left = left + 'px'; menu.style.top = top + 'px';
 }
-
 function closeCtxMenu() {
   document.getElementById('ctx-menu').classList.remove('open');
   document.getElementById('ctx-overlay').classList.remove('open');
   document.getElementById('ctx-submenu').classList.remove('open');
   ctxTaskId = null;
 }
-
 function toggleCtxSubmenu(e) {
   e.stopPropagation();
   const sub = document.getElementById('ctx-submenu');
-  const item = e.currentTarget;
-  const rect = item.getBoundingClientRect();
   const menu = document.getElementById('ctx-menu');
   const menuRect = menu.getBoundingClientRect();
-
+  const rect = e.currentTarget.getBoundingClientRect();
   sub.classList.toggle('open');
   if (sub.classList.contains('open')) {
     const sw = 180;
     const left = menuRect.right + sw > window.innerWidth ? menuRect.left - sw : menuRect.right;
-    sub.style.left = left + 'px';
-    sub.style.top = rect.top + 'px';
+    sub.style.left = left + 'px'; sub.style.top = rect.top + 'px';
   }
 }
-
 function ctxComplete() {
   const tk = tasks.find(t => t.id === ctxTaskId);
   if (!tk) return closeCtxMenu();
@@ -1020,27 +877,19 @@ function ctxComplete() {
   tk.col = 'done';
   closeCtxMenu(); save(); renderAll(); renderDone(); updateStats(); renderHistory();
 }
-
 function ctxPending() {
   const tk = tasks.find(t => t.id === ctxTaskId);
   if (!tk) return closeCtxMenu();
   tk.col = 'pending';
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
-
 function ctxMoveTo(catId) {
   const tk = tasks.find(t => t.id === ctxTaskId);
   if (!tk) return closeCtxMenu();
   tk.col = catId; tk.cat = catId;
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
-
-function ctxEdit() {
-  const id = ctxTaskId;
-  closeCtxMenu();
-  openModal(id);
-}
-
+function ctxEdit() { const id = ctxTaskId; closeCtxMenu(); openModal(id); }
 function ctxDelete() {
   const tk = tasks.find(t => t.id === ctxTaskId);
   if (!tk) return closeCtxMenu();
@@ -1051,7 +900,7 @@ function ctxDelete() {
 
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.1</div>
 
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.3</div>
 </body>
 </html>
