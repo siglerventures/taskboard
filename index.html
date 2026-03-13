@@ -149,7 +149,20 @@ onValue(dataRef, (snapshot) => {
   .clear-done-btn { font-size: 11px; color: #e53e3e; border: none; background: none; cursor: pointer; padding: 0; float: right; }
   .clear-done-btn:hover { text-decoration: underline; }
 
-  /* Modals */
+  /* Context menu */
+  .ctx-menu { position: fixed; z-index: 200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 0.5px solid #e0ddd6; padding: 6px; min-width: 200px; display: none; }
+  .ctx-menu.open { display: block; }
+  .ctx-title { font-size: 11px; font-weight: 600; color: #aaa; padding: 4px 10px 6px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid #f0ede6; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .ctx-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; color: #1a1a1a; }
+  .ctx-item:hover { background: #f4f3ee; }
+  .ctx-item.danger { color: #e53e3e; }
+  .ctx-item .ctx-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+  .ctx-divider { height: 0.5px; background: #f0ede6; margin: 4px 0; }
+  .ctx-submenu-wrap { position: relative; }
+  .ctx-submenu { position: fixed; z-index: 201; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 0.5px solid #e0ddd6; padding: 6px; min-width: 180px; display: none; max-height: 300px; overflow-y: auto; }
+  .ctx-submenu.open { display: block; }
+  .ctx-overlay { display: none; position: fixed; inset: 0; z-index: 199; }
+  .ctx-overlay.open { display: block; }
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
   .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; }
@@ -242,6 +255,22 @@ onValue(dataRef, (snapshot) => {
     <h3>Completed tasks log</h3>
     <div class="log-list" id="log-list"></div>
   </div>
+</div>
+
+<!-- Context Menu -->
+<div class="ctx-overlay" id="ctx-overlay" onclick="closeCtxMenu()"></div>
+<div class="ctx-menu" id="ctx-menu">
+  <div class="ctx-title" id="ctx-title">Task</div>
+  <div class="ctx-item" onclick="ctxComplete()"><span class="ctx-icon">✅</span> Mark Complete</div>
+  <div class="ctx-item" onclick="ctxPending()"><span class="ctx-icon">⏳</span> Move to Pending</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-submenu-wrap">
+    <div class="ctx-item" onclick="toggleCtxSubmenu(event)"><span class="ctx-icon">📂</span> Move to Category <span style="margin-left:auto;font-size:10px;color:#aaa;">▶</span></div>
+    <div class="ctx-submenu" id="ctx-submenu"></div>
+  </div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item" onclick="ctxEdit()"><span class="ctx-icon">✏️</span> Edit / Add Link</div>
+  <div class="ctx-item danger" onclick="ctxDelete()"><span class="ctx-icon">🗑</span> Delete</div>
 </div>
 
 <!-- Task Edit Modal -->
@@ -627,6 +656,15 @@ function renderAll() {
 
       t.querySelector('.task-text').addEventListener('dblclick', e => { e.stopPropagation(); openModal(task.id); });
 
+      // Right-click (desktop) + long-press / tap (mobile) context menu
+      t.addEventListener('contextmenu', e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, task.id); });
+      let tapTimer = null;
+      t.addEventListener('touchstart', e => {
+        tapTimer = setTimeout(() => { openCtxMenu(e.touches[0].clientX, e.touches[0].clientY, task.id); tapTimer = null; }, 500);
+      }, { passive: true });
+      t.addEventListener('touchend', () => { if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; } });
+      t.addEventListener('touchmove', () => { if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; } });
+
       t.addEventListener('dragstart', e => {
         dragId = task.id;
         dragColId = null;
@@ -921,10 +959,97 @@ function importData(event) {
   event.target.value = '';
 }
 
+// ---- Context Menu ----
+let ctxTaskId = null;
+
+function openCtxMenu(x, y, taskId) {
+  ctxTaskId = taskId;
+  const tk = tasks.find(t => t.id === taskId);
+  document.getElementById('ctx-title').textContent = tk.text.length > 30 ? tk.text.slice(0, 30) + '…' : tk.text;
+
+  // Build category submenu
+  const sub = document.getElementById('ctx-submenu');
+  sub.innerHTML = categories.map(cat => `
+    <div class="ctx-item" onclick="ctxMoveTo('${cat.id}')">
+      <span class="ctx-icon">${cat.icon}</span> ${cat.label}
+    </div>`).join('');
+  sub.classList.remove('open');
+
+  // Position menu — keep it on screen
+  const menu = document.getElementById('ctx-menu');
+  menu.classList.add('open');
+  document.getElementById('ctx-overlay').classList.add('open');
+
+  const mw = 220, mh = 280;
+  const left = x + mw > window.innerWidth ? window.innerWidth - mw - 8 : x;
+  const top = y + mh > window.innerHeight ? window.innerHeight - mh - 8 : y;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
+function closeCtxMenu() {
+  document.getElementById('ctx-menu').classList.remove('open');
+  document.getElementById('ctx-overlay').classList.remove('open');
+  document.getElementById('ctx-submenu').classList.remove('open');
+  ctxTaskId = null;
+}
+
+function toggleCtxSubmenu(e) {
+  e.stopPropagation();
+  const sub = document.getElementById('ctx-submenu');
+  const item = e.currentTarget;
+  const rect = item.getBoundingClientRect();
+  const menu = document.getElementById('ctx-menu');
+  const menuRect = menu.getBoundingClientRect();
+
+  sub.classList.toggle('open');
+  if (sub.classList.contains('open')) {
+    const sw = 180;
+    const left = menuRect.right + sw > window.innerWidth ? menuRect.left - sw : menuRect.right;
+    sub.style.left = left + 'px';
+    sub.style.top = rect.top + 'px';
+  }
+}
+
+function ctxComplete() {
+  const tk = tasks.find(t => t.id === ctxTaskId);
+  if (!tk) return closeCtxMenu();
+  if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
+  tk.col = 'done';
+  closeCtxMenu(); save(); renderAll(); renderDone(); updateStats(); renderHistory();
+}
+
+function ctxPending() {
+  const tk = tasks.find(t => t.id === ctxTaskId);
+  if (!tk) return closeCtxMenu();
+  tk.col = 'pending';
+  closeCtxMenu(); save(); renderAll(); updateStats();
+}
+
+function ctxMoveTo(catId) {
+  const tk = tasks.find(t => t.id === ctxTaskId);
+  if (!tk) return closeCtxMenu();
+  tk.col = catId; tk.cat = catId;
+  closeCtxMenu(); save(); renderAll(); updateStats();
+}
+
+function ctxEdit() {
+  const id = ctxTaskId;
+  closeCtxMenu();
+  openModal(id);
+}
+
+function ctxDelete() {
+  const tk = tasks.find(t => t.id === ctxTaskId);
+  if (!tk) return closeCtxMenu();
+  if (!confirm(`Delete "${tk.text}"?`)) return closeCtxMenu();
+  tasks = tasks.filter(t => t.id !== ctxTaskId);
+  closeCtxMenu(); save(); renderAll(); updateStats();
+}
+
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
-  <div style="text-align:center; padding: 1.5rem 0 1rem; font-size: 11px; color: #bbb;">
-  Philinity© Rev2
-</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.1</div>
+
 </body>
 </html>
