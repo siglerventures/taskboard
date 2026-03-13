@@ -102,6 +102,7 @@ onValue(dataRef, (snapshot) => {
   /* Mid section */
   .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
   .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .verse-box { flex: 1; min-width: 200px; font-size: 12px; color: #9ca3af; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #e0ddd6; }
   .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #f4f3ee; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .manage-cats-btn:hover { background: #eae8e1; }
   .stats { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
@@ -218,6 +219,7 @@ onValue(dataRef, (snapshot) => {
       <div class="stat"><div class="stat-num" id="s-alltime" style="color:#6366f1;">0</div><div class="stat-label">All-time</div></div>
       <div class="stat"><div class="stat-num" id="s-pct">0%</div><div class="stat-label">Progress</div></div>
     </div>
+    <div class="verse-box" id="verse-box"></div>
   </div>
   <div class="cat-panel" id="cat-panel">
     <div class="cat-list" id="cat-list"></div>
@@ -903,9 +905,47 @@ function ctxDelete() {
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
 
+// ---- Verse of the hour ----
+const VERSES = [
+  { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
+  { text: "Commit to the Lord whatever you do, and he will establish your plans.", ref: "Proverbs 16:3" },
+  { text: "Whatever you do, work at it with all your heart, as working for the Lord.", ref: "Colossians 3:23" },
+  { text: "The Lord himself goes before you and will be with you; do not be afraid.", ref: "Deuteronomy 31:8" },
+  { text: "Trust in the Lord with all your heart and lean not on your own understanding.", ref: "Proverbs 3:5" },
+  { text: "Be strong and courageous. Do not be afraid; do not be discouraged.", ref: "Joshua 1:9" },
+  { text: "And we know that in all things God works for the good of those who love him.", ref: "Romans 8:28" },
+  { text: "For I know the plans I have for you — plans to prosper you and not to harm you.", ref: "Jeremiah 29:11" },
+  { text: "Do not grow weary in doing good, for at the proper time you will reap a harvest.", ref: "Galatians 6:9" },
+  { text: "The plans of the diligent lead to profit as surely as haste leads to poverty.", ref: "Proverbs 21:5" },
+  { text: "Seek first his kingdom and his righteousness, and all these things will be given to you.", ref: "Matthew 6:33" },
+  { text: "With God all things are possible.", ref: "Matthew 19:26" },
+  { text: "He gives strength to the weary and increases the power of the weak.", ref: "Isaiah 40:29" },
+  { text: "Let us run with perseverance the race marked out for us.", ref: "Hebrews 12:1" },
+  { text: "The Lord will guide you always; he will satisfy your needs.", ref: "Isaiah 58:11" },
+  { text: "Start children off on the way they should go, and even when they are old they will not turn from it.", ref: "Proverbs 22:6" },
+  { text: "Cast all your anxiety on him because he cares for you.", ref: "1 Peter 5:7" },
+  { text: "Delight yourself in the Lord, and he will give you the desires of your heart.", ref: "Psalm 37:4" },
+  { text: "The Lord bless you and keep you; the Lord make his face shine on you.", ref: "Numbers 6:24-25" },
+  { text: "Well done, good and faithful servant!", ref: "Matthew 25:21" },
+  { text: "God is our refuge and strength, an ever-present help in trouble.", ref: "Psalm 46:1" },
+  { text: "With man this is impossible, but with God all things are possible.", ref: "Matthew 19:26" },
+  { text: "In all your ways submit to him, and he will make your paths straight.", ref: "Proverbs 3:6" },
+  { text: "The Lord is my shepherd; I shall not want.", ref: "Psalm 23:1" },
+];
+
+function showVerse() {
+  const hour = new Date().getHours();
+  const idx = hour % VERSES.length;
+  const v = VERSES[idx];
+  const el = document.getElementById('verse-box');
+  if (el) el.innerHTML = `"${v.text}" <span style="font-style:normal;font-weight:600;color:#c4b5d0;">— ${v.ref}</span>`;
+}
+showVerse();
+setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
+
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.4</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.5</div>
 </body>
 </html>
