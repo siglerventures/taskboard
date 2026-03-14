@@ -560,7 +560,7 @@ function renderAll() {
     div.dataset.col = col.id;
     div.innerHTML = `
       <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;"` : ''}>
-        <div class="col-icon" style="background:${iconBg};${col.url ? 'cursor:pointer;box-shadow:0 0 0 2px #6366f1;' : ''}" ${col.url ? `onclick="event.stopPropagation();window.open('${col.url}','_blank')" title="Open: ${col.url}"` : ''}>${col.icon}</div>
+        <div class="col-icon" style="background:${iconBg};${col.url ? 'cursor:pointer;border-bottom:2px solid #6366f1;border-radius:6px 6px 0 0;' : ''}" ${col.url ? `onclick="event.stopPropagation();window.open('${col.url}','_blank')" title="Open: ${col.url}"` : ''}>${col.icon}</div>
         <span class="col-title">${col.label}</span>
         ${col.url ? `<a href="${col.url}" target="_blank" onclick="event.stopPropagation()" title="${col.url}" style="color:#6366f1;opacity:0.6;display:flex;align-items:center;flex-shrink:0;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
         <span class="col-count">${colTasks.length}</span>
