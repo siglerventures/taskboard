@@ -775,6 +775,22 @@ function addTask() {
 
 document.getElementById('new-task-text').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
 
+// Letter-key navigation on category dropdown
+document.getElementById('new-task-cat').addEventListener('keydown', e => {
+  const key = e.key.toLowerCase();
+  if (key.length !== 1 || e.ctrlKey || e.metaKey) return;
+  e.preventDefault();
+  const sel = document.getElementById('new-task-cat');
+  const opts = Array.from(sel.options);
+  // Find all options starting with this letter
+  const matches = opts.filter(o => getCatLabel(o.value).toLowerCase().startsWith(key));
+  if (matches.length === 0) return;
+  // Cycle through matches if same key pressed again
+  const curIdx = matches.findIndex(o => o.value === sel.value);
+  const next = matches[(curIdx + 1) % matches.length];
+  sel.value = next.value;
+});
+
 function clearDone() {
   if (!confirm('Remove all tasks from Done?')) return;
   tasks = tasks.filter(t => t.col !== 'done');
@@ -951,6 +967,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.6</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 2.7</div>
 </body>
 </html>
