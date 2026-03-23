@@ -239,8 +239,18 @@ onValue(dataRef, (snapshot) => {
   <!-- Person stats panel -->
   <div class="person-panel" id="person-panel">
     <div class="person-panel-header">
-      <span style="font-size:12px;font-weight:600;color:#555;">Tasks assigned this month</span>
-      <select id="person-month-select" onchange="renderPersonStats()"></select>
+      <span style="font-size:12px;font-weight:600;color:#555;">Tasks per person</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="person-month-select" onchange="renderPersonStats()"></select>
+        <button onclick="toggleManagePeople()" id="manage-people-btn" style="padding:4px 10px;border-radius:8px;border:0.5px solid #ddd;background:#f4f3ee;font-size:12px;cursor:pointer;">+ Add Person</button>
+      </div>
+    </div>
+    <div id="manage-people-row" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <input type="text" id="new-person-name" placeholder="Name..." maxlength="20" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;width:140px;" />
+      <button onclick="addPerson()" style="padding:5px 12px;border-radius:8px;border:none;background:#1a1a1a;color:#fff;font-size:13px;cursor:pointer;">Add</button>
+      <span style="font-size:11px;color:#aaa;">Current: </span>
+      <div id="people-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <button onclick="migrateAustinToAusten()" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fcd34d;background:#fefce8;color:#92400e;font-size:11px;cursor:pointer;" title="One-time fix: rename Austin → Austen in all data">🔧 Fix Austin→Austen</button>
     </div>
     <div class="person-grid" id="person-grid"></div>
   </div>
@@ -413,12 +423,6 @@ function getDefaultAssignee(catId) {
   if (label === 'trinity') return 'Trinity';
   if (label === 'austen' || label === 'austin') return 'Austen';
   return 'Phil';
-}
-
-function buildAssigneeSelect(selId, current) {
-  const sel = document.getElementById(selId);
-  if (!sel) return;
-  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('');
 }
 
 function load() {
@@ -1017,6 +1021,51 @@ function ctxDelete() {
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
 
+function toggleManagePeople() {
+  const row = document.getElementById('manage-people-row');
+  const showing = row.style.display === 'flex';
+  row.style.display = showing ? 'none' : 'flex';
+  if (!showing) renderPeopleChips();
+}
+
+function renderPeopleChips() {
+  document.getElementById('people-chips').innerHTML = PEOPLE.map(p =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;background:#f4f3ee;font-size:11px;font-weight:500;">
+      ${p}
+      ${PEOPLE.length > 1 ? `<button onclick="removePerson('${p}')" style="border:none;background:none;cursor:pointer;color:#ccc;font-size:13px;line-height:1;padding:0;" title="Remove">×</button>` : ''}
+    </span>`
+  ).join('');
+}
+
+function addPerson() {
+  const name = document.getElementById('new-person-name').value.trim();
+  if (!name || PEOPLE.includes(name)) return;
+  PEOPLE.push(name);
+  document.getElementById('new-person-name').value = '';
+  save(); renderPeopleChips(); renderPersonStats();
+  rebuildAssigneeSelects();
+}
+
+function removePerson(name) {
+  if (!confirm(`Remove ${name} from the people list?`)) return;
+  PEOPLE = PEOPLE.filter(p => p !== name);
+  save(); renderPeopleChips(); renderPersonStats();
+  rebuildAssigneeSelects();
+}
+
+function rebuildAssigneeSelects() {
+  const sel = document.getElementById('edit-assignee');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === cur ? 'selected' : ''}>${p}</option>`).join('');
+}
+
+function buildAssigneeSelect(selId, current) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('');
+}
+
 // ---- Person Stats Panel ----
 function togglePersonPanel() {
   personPanelOpen = !personPanelOpen;
@@ -1090,6 +1139,24 @@ function renderPersonStats() {
     </div>`).join('');
 }
 
+function migrateAustinToAusten() {
+  let fixed = 0;
+  tasks.forEach(tk => {
+    if (tk.assignee === 'Austin') { tk.assignee = 'Austen'; fixed++; }
+  });
+  completionLog.forEach(l => {
+    if (l.assignee === 'Austin') { l.assignee = 'Austen'; fixed++; }
+  });
+  PEOPLE = PEOPLE.map(p => p === 'Austin' ? 'Austen' : p);
+  if (fixed > 0) {
+    save();
+    alert(`Fixed ${fixed} record(s) — Austin → Austen ✓`);
+    renderAll(); renderDone(); renderPersonStats();
+  } else {
+    alert('No Austin records found — already clean!');
+  }
+}
+
 // ---- Verse of the hour ----
 const VERSES = [
   { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
@@ -1131,6 +1198,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.7.2</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.9</div>
 </body>
 </html>
