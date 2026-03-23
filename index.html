@@ -40,6 +40,7 @@ onValue(dataRef, (snapshot) => {
   taskOrder = data.taskOrder || {};
   nextId = data.nextId || 100;
   nextCatId = data.nextCatId || 50;
+  if (data.people) PEOPLE = data.people;
   rebuildCatSelects();
   renderAll();
   renderHistory();
@@ -402,7 +403,8 @@ let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
 
 // People list — expandable
-const PEOPLE = ['Phil', 'Trinity', 'Austen'];
+// People list — add names here to expand (or use Manage People in the UI)
+let PEOPLE = ['Phil', 'Trinity', 'Austen'];
 
 // Default assignee by category
 function getDefaultAssignee(catId) {
@@ -427,6 +429,8 @@ function load() {
     taskOrder = JSON.parse(localStorage.getItem('phil-taskorder-v6') || '{}');
     nextId = parseInt(localStorage.getItem('phil-nextid-v6') || '100');
     nextCatId = parseInt(localStorage.getItem('phil-nextcatid-v6') || '50');
+    const savedPeople = JSON.parse(localStorage.getItem('phil-people-v6') || 'null');
+    if (savedPeople) PEOPLE = savedPeople;
   } catch(e) {
     tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
     categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
@@ -448,9 +452,10 @@ function save() {
   localStorage.setItem('phil-taskorder-v6', JSON.stringify(taskOrder));
   localStorage.setItem('phil-nextid-v6', nextId);
   localStorage.setItem('phil-nextcatid-v6', nextCatId);
+  localStorage.setItem('phil-people-v6', JSON.stringify(PEOPLE));
   if (window._fbRef && window._fbSet) {
     window._suppressListener = true;
-    window._fbSet(window._fbRef, { tasks, categories, completionLog, taskOrder, nextId, nextCatId })
+    window._fbSet(window._fbRef, { tasks, categories, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE })
       .then(() => { showSyncNotice('Saved ☁️ ✓'); setTimeout(() => window._suppressListener = false, 1000); })
       .catch(() => showSyncNotice('Saved locally ✓'));
   } else {
@@ -1126,6 +1131,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.8</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.7.2</div>
 </body>
 </html>
