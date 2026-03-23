@@ -115,7 +115,7 @@ onValue(dataRef, (snapshot) => {
   /* Mid section */
   .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
   .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  .verse-box { flex: 1; min-width: 200px; font-size: 12px; color: #9ca3af; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #e0ddd6; }
+  .verse-box { flex: 1; min-width: 200px; font-size: 13px; color: #9ca3af; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #e0ddd6; }
   .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #f4f3ee; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
   .manage-cats-btn:hover { background: #eae8e1; }
   .stats { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
@@ -402,15 +402,15 @@ let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
 
 // People list — expandable
-const PEOPLE = ['Phil', 'Trinity', 'Austin'];
+const PEOPLE = ['Phil', 'Trinity', 'Austen'];
 
 // Default assignee by category
-const CAT_ASSIGNEE = {
-  'trinity': 'Trinity',
-  'cc': 'Austin',
-};
 function getDefaultAssignee(catId) {
-  return CAT_ASSIGNEE[catId] || 'Phil';
+  const cat = getCatById(catId);
+  const label = (cat ? cat.label : catId).toLowerCase();
+  if (label === 'trinity') return 'Trinity';
+  if (label === 'austen' || label === 'austin') return 'Austen';
+  return 'Phil';
 }
 
 function buildAssigneeSelect(selId, current) {
@@ -767,7 +767,12 @@ function renderAll() {
 }
 
 function renderDone() {
-  const doneTasks = sortTasks(tasks.filter(t => t.col === 'done'), 'done');
+  const doneTasks = tasks.filter(t => t.col === 'done')
+    .sort((a, b) => {
+      const at = a.completedAt || a.dateAdded || '';
+      const bt = b.completedAt || b.dateAdded || '';
+      return bt.localeCompare(at); // newest first
+    });
   const el = document.getElementById('done-list');
   if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
   el.innerHTML = doneTasks.map(task => {
@@ -1036,19 +1041,20 @@ function renderPersonStats() {
   const monthKey = sel ? sel.value : '';
   const grid = document.getElementById('person-grid');
 
-  // Count tasks added this month per person
-  const added = {};
-  const completed = {};
-  PEOPLE.forEach(p => { added[p] = 0; completed[p] = 0; });
+  // Count ALL active tasks per person (not filtered by month)
+  const assigned = {};
+  PEOPLE.forEach(p => { assigned[p] = 0; });
 
   tasks.forEach(tk => {
-    if (!tk.dateAdded) return;
-    const key = tk.dateAdded.slice(0, 7);
-    if (key !== monthKey) return;
+    if (tk.col === 'done') return; // don't count done tasks in active
     const person = tk.assignee || getDefaultAssignee(tk.cat);
-    if (added[person] !== undefined) added[person]++;
-    else added[person] = 1;
+    if (assigned[person] !== undefined) assigned[person]++;
+    else assigned[person] = 1;
   });
+
+  // Count completions for selected month from completionLog
+  const completed = {};
+  PEOPLE.forEach(p => { completed[p] = 0; });
 
   completionLog.forEach(l => {
     if (!l.completedAt) return;
@@ -1059,14 +1065,23 @@ function renderPersonStats() {
     else completed[person] = 1;
   });
 
-  const allPeople = [...new Set([...PEOPLE, ...Object.keys(added), ...Object.keys(completed)])];
+  // Also count done tasks that have completedAt in selected month
+  tasks.filter(t => t.col === 'done' && t.completedAt).forEach(tk => {
+    const key = tk.completedAt.slice(0, 7);
+    if (key !== monthKey) return;
+    const person = tk.assignee || getDefaultAssignee(tk.cat);
+    if (completed[person] !== undefined) completed[person]++;
+    else completed[person] = 1;
+  });
+
+  const allPeople = [...new Set([...PEOPLE, ...Object.keys(assigned)])];
   grid.innerHTML = allPeople.map(p => `
     <div class="person-card">
       <div class="person-card-name">${p}</div>
-      <div class="person-card-num">${added[p] || 0}</div>
-      <div class="person-card-label">assigned</div>
+      <div class="person-card-num">${assigned[p] || 0}</div>
+      <div class="person-card-label">active tasks</div>
       <div style="font-size:13px;font-weight:700;color:#4caf50;margin-top:4px;">${completed[p] || 0}</div>
-      <div class="person-card-label">completed</div>
+      <div class="person-card-label">completed this month</div>
     </div>`).join('');
 }
 
@@ -1111,6 +1126,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.7</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.8</div>
 </body>
 </html>
