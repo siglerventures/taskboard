@@ -264,20 +264,30 @@ onValue(dataRef, (snapshot) => {
   </div>
 </div>
 
-<!-- BOTTOM: Done + History -->
-<div class="bottom-section-title">📊 Done &amp; History</div>
-<div class="bottom-section">
-  <div class="bottom-card" id="done-col-card">
-    <h3>✓ Done <button class="clear-done-btn" onclick="clearDone()">clear all</button></h3>
-    <div class="done-task-list" id="done-list"></div>
-  </div>
+<!-- BOTTOM: History -->
+<div class="bottom-section-title">📊 Completion History</div>
+<div class="bottom-section" style="grid-template-columns: 1fr 1fr;">
   <div class="bottom-card">
-    <h3>Monthly completions (last 6 months)</h3>
+    <h3>Monthly completions (last 12 months)</h3>
     <div class="chart-wrap"><canvas id="monthly-chart"></canvas></div>
   </div>
   <div class="bottom-card">
-    <h3>Completed tasks log</h3>
+    <h3>Completed tasks log <span style="font-weight:400;color:#bbb;font-size:10px;text-transform:none;letter-spacing:0;">— double-click to restore</span></h3>
     <div class="log-list" id="log-list"></div>
+  </div>
+</div>
+
+<!-- Restore Log Item Modal -->
+<div class="modal-overlay" id="restore-modal">
+  <div class="modal">
+    <h2>Restore task</h2>
+    <p style="font-size:13px;color:#555;margin-bottom:1rem;" id="restore-task-name"></p>
+    <label>Move back to category</label>
+    <select id="restore-cat"></select>
+    <div class="modal-actions">
+      <button onclick="closeRestoreModal()">Cancel</button>
+      <button class="confirm" onclick="confirmRestore()">Restore</button>
+    </div>
   </div>
 </div>
 
@@ -760,19 +770,7 @@ function renderAll() {
     });
   });
 
-  const doneCard = document.getElementById('done-col-card');
-  doneCard.ondragover = e => { e.preventDefault(); doneCard.style.outline = '2px dashed #4caf50'; };
-  doneCard.ondragleave = () => { doneCard.style.outline = ''; };
-  doneCard.ondrop = e => {
-    e.preventDefault(); doneCard.style.outline = '';
-    if (dragId !== null) {
-      const tk = tasks.find(x => x.id === dragId);
-      if (tk) { moveTask(tk, 'done'); save(); }
-      dragId = null; renderAll(); renderDone(); updateStats(); renderHistory();
-    }
-  };
-
-  updateStats(); renderDone();
+  updateStats();
 }
 
 function renderDone() {
@@ -818,10 +816,10 @@ function renderHistory() {
   const el = document.getElementById('log-list');
   if (completionLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
   else {
-    el.innerHTML = completionLog.slice(0, 60).map(l => {
+    el.innerHTML = completionLog.slice(0, 60).map((l, idx) => {
       const d = new Date(l.completedAt);
       const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-      return `<div class="log-item"><span class="log-text">${l.text}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${getCatLabel(l.cat)}</span></div></div>`;
+      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${idx})" title="Double-click to restore this task"><span class="log-text">${l.text}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${getCatLabel(l.cat)}</span></div></div>`;
     }).join('');
   }
   const ctx = document.getElementById('monthly-chart').getContext('2d');
@@ -834,7 +832,7 @@ function renderHistory() {
   }
   const months = [];
   const now = new Date();
-  for (let i = 5; i >= 0; i--) {
+  for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), count: 0 });
   }
@@ -1157,6 +1155,42 @@ function migrateAustinToAusten() {
   }
 }
 
+// ---- Restore from log ----
+let restoringLogIdx = null;
+
+function openRestoreModal(idx) {
+  restoringLogIdx = idx;
+  const l = completionLog[idx];
+  document.getElementById('restore-task-name').textContent = `"${l.text}"`;
+  const sel = document.getElementById('restore-cat');
+  sel.innerHTML = categories.map(c => `<option value="${c.id}" ${c.id === l.cat ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
+  document.getElementById('restore-modal').classList.add('open');
+}
+function closeRestoreModal() {
+  document.getElementById('restore-modal').classList.remove('open');
+  restoringLogIdx = null;
+}
+function confirmRestore() {
+  const l = completionLog[restoringLogIdx];
+  const catId = document.getElementById('restore-cat').value;
+  const newTask = {
+    id: nextId++,
+    text: l.text,
+    cat: catId,
+    col: catId,
+    priority: 'medium',
+    assignee: l.assignee || getDefaultAssignee(catId),
+    dateAdded: new Date().toISOString(),
+  };
+  tasks.push(newTask);
+  if (!taskOrder[catId]) taskOrder[catId] = [];
+  taskOrder[catId].unshift(newTask.id);
+  completionLog.splice(restoringLogIdx, 1);
+  closeRestoreModal();
+  save(); rebuildCatSelects(); renderAll(); updateStats(); renderHistory();
+}
+document.getElementById('restore-modal').addEventListener('click', e => { if (e.target === document.getElementById('restore-modal')) closeRestoreModal(); });
+
 // ---- Verse of the hour ----
 const VERSES = [
   { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
@@ -1198,6 +1232,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.9</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3</div>
 </body>
 </html>
