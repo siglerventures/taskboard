@@ -98,6 +98,19 @@ onValue(dataRef, (snapshot) => {
   .task-link svg { width: 11px; height: 11px; }
   .drop-hint { font-size: 11px; color: #bbb; text-align: center; padding: 14px 6px; border: 1px dashed #ddd; border-radius: 8px; }
   .task-insert-line { height: 3px; background: #6366f1; border-radius: 2px; margin: 2px 0; }
+  .task-date { font-size: 9px; color: #bbb; margin-top: 2px; }
+  .assignee-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; background: #f1f5f9; color: #475569; white-space: nowrap; }
+
+  /* Person stats panel */
+  .person-panel { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 0.5px solid #f0ede6; }
+  .person-panel.open { display: block; }
+  .person-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px; }
+  .person-panel-header select { padding: 5px 9px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 12px; background: #fff; }
+  .person-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+  .person-card { background: #f4f3ee; border-radius: 10px; padding: 0.6rem 1rem; min-width: 80px; text-align: center; }
+  .person-card-name { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
+  .person-card-num { font-size: 22px; font-weight: 700; color: #6366f1; }
+  .person-card-label { font-size: 9px; color: #aaa; margin-top: 1px; }
 
   /* Mid section */
   .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
@@ -212,6 +225,7 @@ onValue(dataRef, (snapshot) => {
 <div class="mid-section">
   <div class="mid-row">
     <button class="manage-cats-btn" onclick="toggleCatPanel()">🗂 Manage Categories ▾</button>
+    <button class="manage-cats-btn" onclick="togglePersonPanel()" id="person-panel-btn">👥 Person Stats ▾</button>
     <div class="stats">
       <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">Total</div></div>
       <div class="stat"><div class="stat-num" id="s-pending" style="color:#6b7280;">0</div><div class="stat-label">Pending</div></div>
@@ -220,6 +234,14 @@ onValue(dataRef, (snapshot) => {
       <div class="stat"><div class="stat-num" id="s-pct">0%</div><div class="stat-label">Progress</div></div>
     </div>
     <div class="verse-box" id="verse-box"></div>
+  </div>
+  <!-- Person stats panel -->
+  <div class="person-panel" id="person-panel">
+    <div class="person-panel-header">
+      <span style="font-size:12px;font-weight:600;color:#555;">Tasks assigned this month</span>
+      <select id="person-month-select" onchange="renderPersonStats()"></select>
+    </div>
+    <div class="person-grid" id="person-grid"></div>
   </div>
   <div class="cat-panel" id="cat-panel">
     <div class="cat-list" id="cat-list"></div>
@@ -280,6 +302,10 @@ onValue(dataRef, (snapshot) => {
     </div>
     <label>Link URL <span style="font-size:10px;color:#aaa;">(optional)</span></label>
     <input type="url" id="edit-url" placeholder="https://..." />
+    <label>📞 Phone # <span style="font-size:10px;color:#aaa;">(optional)</span></label>
+    <input type="tel" id="edit-phone" placeholder="(208) 555-1234" />
+    <label>Assigned to</label>
+    <select id="edit-assignee"></select>
     <label>Notes <span style="font-size:10px;color:#aaa;">(optional)</span></label>
     <textarea id="edit-notes" placeholder="Add any additional details..." style="width:100%;padding:8px 10px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;resize:vertical;min-height:80px;"></textarea>
     <div class="modal-actions">
@@ -373,7 +399,25 @@ let tasks = [], categories = [], completionLog = [], taskOrder = {};
 let nextId = 100, nextCatId = 50;
 let dragId = null, dragColId = null, editingId = null, editingCatId = null, chartInstance = null;
 let newTaskPriority = 'medium', editTaskPriority = 'medium';
-let catPanelOpen = false;
+let catPanelOpen = false, personPanelOpen = false;
+
+// People list — expandable
+const PEOPLE = ['Phil', 'Trinity', 'Austin'];
+
+// Default assignee by category
+const CAT_ASSIGNEE = {
+  'trinity': 'Trinity',
+  'cc': 'Austin',
+};
+function getDefaultAssignee(catId) {
+  return CAT_ASSIGNEE[catId] || 'Phil';
+}
+
+function buildAssigneeSelect(selId, current) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('');
+}
 
 function load() {
   try {
@@ -524,9 +568,30 @@ function rebuildCatSelects() {
   });
 }
 
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
+
+function timeTaken(addedIso, completedIso) {
+  if (!addedIso || !completedIso) return '';
+  const ms = new Date(completedIso) - new Date(addedIso);
+  if (ms < 0) return '';
+  const totalMins = Math.floor(ms / 60000);
+  const days = Math.floor(totalMins / 1440);
+  const hrs = Math.floor((totalMins % 1440) / 60);
+  const mins = totalMins % 60;
+  if (days > 0) return `${days}d ${hrs}h to complete`;
+  if (hrs > 0) return `${hrs}h ${mins}m to complete`;
+  return `${mins}m to complete`;
+}
+
 function moveTask(tk, targetColId) {
   if (targetColId === 'done') {
-    if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
+    const now = new Date().toISOString();
+    if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
+    tk.completedAt = now;
     tk.col = 'done';
   } else if (targetColId === 'pending') {
     tk.col = 'pending';
@@ -592,19 +657,24 @@ function renderAll() {
           <div style="display:flex;align-items:flex-start;gap:3px;">
             <span class="task-text">${task.text}</span>
             ${task.url ? `<a class="task-link" href="${task.url}" target="_blank" title="${task.url}" onclick="event.stopPropagation()"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
+            ${task.phone ? `<a class="task-link" href="tel:${task.phone}" title="${task.phone}" onclick="event.stopPropagation()" style="color:#16a34a;">📞</a>` : ''}
           </div>
           <div class="task-meta">
             <span class="cat-badge" style="${getBadgeStyle(task.cat)}">${getCatIcon(task.cat)} ${getCatLabel(task.cat)}</span>
             <span class="priority-pill p-${p}" title="Click to cycle priority">${p}</span>
+            <span class="assignee-badge">👤 ${task.assignee || getDefaultAssignee(task.cat)}</span>
             ${task.notes ? `<span style="font-size:10px;color:#94a3b8;" title="${task.notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
           </div>
+          ${task.dateAdded ? `<div class="task-date">Added ${fmtDate(task.dateAdded)}</div>` : ''}
         </div>`;
 
       t.querySelector('.check').addEventListener('click', e => {
         e.stopPropagation();
         const tk = tasks.find(x => x.id === task.id);
-        completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
+        const now = new Date().toISOString();
+        completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
         tk.col = 'done';
+        tk.completedAt = now;
         save(); renderAll(); renderDone(); updateStats(); renderHistory();
       });
       t.querySelector('.priority-pill').addEventListener('click', e => { e.stopPropagation(); cyclePriority(task.id); });
@@ -700,7 +770,10 @@ function renderDone() {
   const doneTasks = sortTasks(tasks.filter(t => t.col === 'done'), 'done');
   const el = document.getElementById('done-list');
   if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
-  el.innerHTML = doneTasks.map(task => `
+  el.innerHTML = doneTasks.map(task => {
+    const taken = task.dateAdded && task.completedAt ? timeTaken(task.dateAdded, task.completedAt) : '';
+    const completedStr = task.completedAt ? `Completed ${fmtDate(task.completedAt)}` : '';
+    return `
     <div class="done-item">
       <button class="done-uncheck" onclick="undoneTask(${task.id})" title="Move back">
         <svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -710,9 +783,12 @@ function renderDone() {
         <div class="task-meta" style="margin-top:3px;">
           <span class="cat-badge" style="${getBadgeStyle(task.cat)};font-size:9px;">${getCatLabel(task.cat)}</span>
           <span class="priority-pill p-${task.priority||'medium'}" style="font-size:9px;">${task.priority||'medium'}</span>
+          ${task.assignee ? `<span style="font-size:9px;color:#64748b;">👤 ${task.assignee}</span>` : ''}
         </div>
+        ${completedStr || taken ? `<div style="font-size:9px;color:#bbb;margin-top:2px;">${completedStr}${taken ? ` · ${taken}` : ''}</div>` : ''}
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function undoneTask(id) {
@@ -765,7 +841,7 @@ function addTask() {
   const text = document.getElementById('new-task-text').value.trim();
   const cat = document.getElementById('new-task-cat').value;
   if (!text) return;
-  const newTask = { id: nextId++, text, cat, col: cat, priority: newTaskPriority };
+  const newTask = { id: nextId++, text, cat, col: cat, priority: newTaskPriority, dateAdded: new Date().toISOString(), assignee: getDefaultAssignee(cat) };
   tasks.push(newTask);
   if (!taskOrder[cat]) taskOrder[cat] = [];
   taskOrder[cat].unshift(newTask.id);
@@ -802,9 +878,11 @@ function openModal(id) {
   const task = tasks.find(t => t.id === id);
   document.getElementById('edit-text').value = task.text;
   document.getElementById('edit-url').value = task.url || '';
+  document.getElementById('edit-phone').value = task.phone || '';
   document.getElementById('edit-notes').value = task.notes || '';
   rebuildCatSelects();
   document.getElementById('edit-cat').value = task.cat;
+  buildAssigneeSelect('edit-assignee', task.assignee || getDefaultAssignee(task.cat));
   editTaskPriority = task.priority || 'medium';
   setEditPriority(editTaskPriority);
   document.getElementById('modal').classList.add('open');
@@ -817,7 +895,10 @@ function saveEdit() {
   tk.priority = editTaskPriority;
   tk.cat = newCat;
   tk.url = document.getElementById('edit-url').value.trim() || '';
+  tk.phone = document.getElementById('edit-phone').value.trim() || '';
   tk.notes = document.getElementById('edit-notes').value.trim() || '';
+  tk.assignee = document.getElementById('edit-assignee').value || getDefaultAssignee(newCat);
+  if (!tk.dateAdded) tk.dateAdded = new Date().toISOString();
   if (!SYSTEM_COLS.includes(tk.col) && tk.col !== 'pending') tk.col = newCat;
   closeModal(); save(); renderAll(); updateStats();
 }
@@ -926,6 +1007,69 @@ function ctxDelete() {
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
 
+// ---- Person Stats Panel ----
+function togglePersonPanel() {
+  personPanelOpen = !personPanelOpen;
+  document.getElementById('person-panel').classList.toggle('open', personPanelOpen);
+  document.getElementById('person-panel-btn').textContent = personPanelOpen ? '👥 Person Stats ▴' : '👥 Person Stats ▾';
+  if (personPanelOpen) {
+    buildMonthSelect();
+    renderPersonStats();
+  }
+}
+
+function buildMonthSelect() {
+  const sel = document.getElementById('person-month-select');
+  const now = new Date();
+  const opts = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    opts.push(`<option value="${key}">${label}</option>`);
+  }
+  sel.innerHTML = opts.join('');
+}
+
+function renderPersonStats() {
+  const sel = document.getElementById('person-month-select');
+  const monthKey = sel ? sel.value : '';
+  const grid = document.getElementById('person-grid');
+
+  // Count tasks added this month per person
+  const added = {};
+  const completed = {};
+  PEOPLE.forEach(p => { added[p] = 0; completed[p] = 0; });
+
+  tasks.forEach(tk => {
+    if (!tk.dateAdded) return;
+    const key = tk.dateAdded.slice(0, 7);
+    if (key !== monthKey) return;
+    const person = tk.assignee || getDefaultAssignee(tk.cat);
+    if (added[person] !== undefined) added[person]++;
+    else added[person] = 1;
+  });
+
+  completionLog.forEach(l => {
+    if (!l.completedAt) return;
+    const key = l.completedAt.slice(0, 7);
+    if (key !== monthKey) return;
+    const person = l.assignee || 'Phil';
+    if (completed[person] !== undefined) completed[person]++;
+    else completed[person] = 1;
+  });
+
+  const allPeople = [...new Set([...PEOPLE, ...Object.keys(added), ...Object.keys(completed)])];
+  grid.innerHTML = allPeople.map(p => `
+    <div class="person-card">
+      <div class="person-card-name">${p}</div>
+      <div class="person-card-num">${added[p] || 0}</div>
+      <div class="person-card-label">assigned</div>
+      <div style="font-size:13px;font-weight:700;color:#4caf50;margin-top:4px;">${completed[p] || 0}</div>
+      <div class="person-card-label">completed</div>
+    </div>`).join('');
+}
+
 // ---- Verse of the hour ----
 const VERSES = [
   { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
@@ -967,6 +1111,6 @@ setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 2.7</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev2.7</div>
 </body>
 </html>
