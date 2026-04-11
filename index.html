@@ -10,7 +10,6 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
   authDomain: "philinity-893d2.firebaseapp.com",
@@ -20,16 +19,13 @@ const firebaseConfig = {
   messagingSenderId: "443020781676",
   appId: "1:443020781676:web:614ec91c9ba33076eb9049"
 };
-
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const dataRef = ref(db, 'philinity');
-
 window._fbRef = dataRef;
 window._fbSet = set;
 window._fbOnValue = onValue;
 window._fbReady = true;
-
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
@@ -50,8 +46,6 @@ onValue(dataRef, (snapshot) => {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f3ee; min-height: 100vh; padding: 1.25rem 1.5rem; color: #1a1a1a; }
-
-  /* Top bar */
   .top-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
   .top-bar h1 { font-size: 18px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
   .top-bar input[type="text"] { flex: 1; min-width: 160px; padding: 7px 12px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
@@ -67,8 +61,6 @@ onValue(dataRef, (snapshot) => {
   .priority-btn.selected-low { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
   .sort-label { font-size: 12px; color: #888; white-space: nowrap; }
   .save-notice { font-size: 11px; color: #4caf50; min-height: 14px; margin-bottom: 0.5rem; }
-
-  /* Board */
   .columns-wrap { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; margin-bottom: 1.5rem; }
   .col { background: #eae8e1; border-radius: 12px; padding: 10px; min-width: 190px; width: 190px; flex-shrink: 0; }
   .col.drag-over { outline: 2px dashed #888; outline-offset: -2px; }
@@ -101,8 +93,6 @@ onValue(dataRef, (snapshot) => {
   .task-insert-line { height: 3px; background: #6366f1; border-radius: 2px; margin: 2px 0; }
   .task-date { font-size: 9px; color: #bbb; margin-top: 2px; }
   .assignee-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; background: #f1f5f9; color: #475569; white-space: nowrap; }
-
-  /* Person stats panel */
   .person-panel { display: none; margin-top: 1rem; padding-top: 1rem; border-top: 0.5px solid #f0ede6; }
   .person-panel.open { display: block; }
   .person-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px; }
@@ -112,8 +102,6 @@ onValue(dataRef, (snapshot) => {
   .person-card-name { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
   .person-card-num { font-size: 22px; font-weight: 700; color: #6366f1; }
   .person-card-label { font-size: 9px; color: #aaa; margin-top: 1px; }
-
-  /* Mid section */
   .mid-section { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
   .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .verse-box { flex: 1; min-width: 200px; font-size: 13px; color: #9ca3af; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #e0ddd6; }
@@ -135,8 +123,6 @@ onValue(dataRef, (snapshot) => {
   .add-cat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .add-cat-row input[type="text"] { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
   .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; cursor: pointer; }
-
-  /* Bottom section */
   .bottom-section-title { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
   .bottom-section { display: grid; grid-template-columns: 280px 1fr 1fr; gap: 16px; align-items: stretch; }
   @media (max-width: 900px) { .bottom-section { grid-template-columns: 1fr 1fr; } }
@@ -160,8 +146,6 @@ onValue(dataRef, (snapshot) => {
   .empty-state { font-size: 13px; color: #bbb; text-align: center; padding: 1.5rem 0; }
   .clear-done-btn { font-size: 11px; color: #e53e3e; border: none; background: none; cursor: pointer; padding: 0; float: right; }
   .clear-done-btn:hover { text-decoration: underline; }
-
-  /* Context menu */
   .ctx-menu { position: fixed; z-index: 200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 0.5px solid #e0ddd6; padding: 6px; min-width: 200px; display: none; }
   .ctx-menu.open { display: block; }
   .ctx-title { font-size: 11px; font-weight: 600; color: #aaa; padding: 4px 10px 6px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid #f0ede6; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
@@ -175,8 +159,6 @@ onValue(dataRef, (snapshot) => {
   .ctx-submenu.open { display: block; }
   .ctx-overlay { display: none; position: fixed; inset: 0; z-index: 199; }
   .ctx-overlay.open { display: block; }
-
-  /* Modals */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
   .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; }
@@ -192,6 +174,37 @@ onValue(dataRef, (snapshot) => {
 </style>
 </head>
 <body>
+
+<!-- PASSWORD GATE -->
+<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#f4f3ee;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+  <div style="font-size:32px">📋</div>
+  <div style="font-size:20px;font-weight:600;color:#1a1a1a">Philinity's Task Board</div>
+  <div style="font-size:13px;color:#888;margin-bottom:4px">Private — Enter password to continue</div>
+  <input type="password" id="pw-input" placeholder="Password"
+    style="background:#fff;border:0.5px solid #ddd;color:#1a1a1a;padding:10px 18px;border-radius:8px;font-size:15px;outline:none;width:240px;text-align:center"
+    onkeydown="if(event.key==='Enter') checkPW()">
+  <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:9px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Enter</button>
+  <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none">Incorrect password</div>
+</div>
+<script>
+(function() {
+  var ok = sessionStorage.getItem('taskboard_auth') === 'ok';
+  if (!ok) {
+    document.getElementById('auth-gate').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+})();
+function checkPW() {
+  if (document.getElementById('pw-input').value === '1002') {
+    sessionStorage.setItem('taskboard_auth', 'ok');
+    document.getElementById('auth-gate').style.display = 'none';
+    document.body.style.overflow = '';
+  } else {
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-input').value = '';
+  }
+}
+</script>
 
 <!-- TOP BAR -->
 <div class="top-bar">
@@ -219,11 +232,9 @@ onValue(dataRef, (snapshot) => {
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
 </div>
 <div class="save-notice" id="save-notice"></div>
-
 <!-- BOARD -->
 <div class="columns-wrap" id="columns-wrap"></div>
-
-<!-- MID: Stats + Manage Categories -->
+<!-- MID -->
 <div class="mid-section">
   <div class="mid-row">
     <button class="manage-cats-btn" onclick="toggleCatPanel()">🗂 Manage Categories ▾</button>
@@ -237,7 +248,6 @@ onValue(dataRef, (snapshot) => {
     </div>
     <div class="verse-box" id="verse-box"></div>
   </div>
-  <!-- Person stats panel -->
   <div class="person-panel" id="person-panel">
     <div class="person-panel-header">
       <span style="font-size:12px;font-weight:600;color:#555;">Tasks per person</span>
@@ -251,7 +261,7 @@ onValue(dataRef, (snapshot) => {
       <button onclick="addPerson()" style="padding:5px 12px;border-radius:8px;border:none;background:#1a1a1a;color:#fff;font-size:13px;cursor:pointer;">Add</button>
       <span style="font-size:11px;color:#aaa;">Current: </span>
       <div id="people-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
-      <button onclick="migrateAustinToAusten()" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fcd34d;background:#fefce8;color:#92400e;font-size:11px;cursor:pointer;" title="One-time fix: rename Austin → Austen in all data">🔧 Fix Austin→Austen</button>
+      <button onclick="migrateAustinToAusten()" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fcd34d;background:#fefce8;color:#92400e;font-size:11px;cursor:pointer;">🔧 Fix Austin→Austen</button>
     </div>
     <div class="person-grid" id="person-grid"></div>
   </div>
@@ -259,13 +269,12 @@ onValue(dataRef, (snapshot) => {
     <div class="cat-list" id="cat-list"></div>
     <div class="add-cat-row">
       <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
-      <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #ddd;border-radius:8px;background:#fff;" title="Type or paste any emoji" />
+      <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #ddd;border-radius:8px;background:#fff;" />
       <button onclick="addCategory()">+ Add Category</button>
     </div>
   </div>
 </div>
-
-<!-- BOTTOM: History -->
+<!-- BOTTOM -->
 <div class="bottom-section-title">📊 Completion History</div>
 <div class="bottom-section" style="grid-template-columns: 0.9fr 1fr;">
   <div class="bottom-card">
@@ -277,8 +286,7 @@ onValue(dataRef, (snapshot) => {
     <div class="chart-wrap"><div class="chart-inner"><canvas id="monthly-chart"></canvas></div></div>
   </div>
 </div>
-
-<!-- Restore Log Item Modal -->
+<!-- Restore Modal -->
 <div class="modal-overlay" id="restore-modal">
   <div class="modal">
     <h2>Restore task</h2>
@@ -291,7 +299,6 @@ onValue(dataRef, (snapshot) => {
     </div>
   </div>
 </div>
-
 <!-- Context Menu -->
 <div class="ctx-overlay" id="ctx-overlay" onclick="closeCtxMenu()"></div>
 <div class="ctx-menu" id="ctx-menu">
@@ -307,7 +314,6 @@ onValue(dataRef, (snapshot) => {
   <div class="ctx-item" onclick="ctxEdit()"><span class="ctx-icon">✏️</span> Edit / Add Link</div>
   <div class="ctx-item danger" onclick="ctxDelete()"><span class="ctx-icon">🗑</span> Delete</div>
 </div>
-
 <!-- Task Edit Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -337,7 +343,6 @@ onValue(dataRef, (snapshot) => {
     </div>
   </div>
 </div>
-
 <!-- Category Edit Modal -->
 <div class="modal-overlay" id="cat-modal">
   <div class="modal">
@@ -354,8 +359,18 @@ onValue(dataRef, (snapshot) => {
     </div>
   </div>
 </div>
-
 <script>
+// ── SECURITY: XSS escape utility ──────────────────────────
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 const CAT_COLORS = {
   'autoflag': { bg: '#ede9fe', color: '#5b21b6' },
   'cc':       { bg: '#fee2d5', color: '#c2410c' },
@@ -376,7 +391,6 @@ const COLOR_PALETTE = [
   { bg: '#eff6ff', color: '#1e3a8a' },{ bg: '#fdf4ff', color: '#86198f' },
 ];
 const SYSTEM_COLS = ['pending', 'done'];
-
 const DEFAULT_CATEGORIES = [
   { id: 'autoflag', label: 'AutoFlag', icon: '🚩' },
   { id: 'cc', label: 'Computer Central', icon: '💻' },
@@ -388,7 +402,6 @@ const DEFAULT_CATEGORIES = [
   { id: 'personal', label: 'Personal', icon: '⭐' },
   { id: 'trinity', label: 'Trinity', icon: '❤️' },
 ];
-
 const DEFAULT_TASKS = [
   { id: 1,  text: 'COB flag sheet → G-Sheets', cat: 'autoflag', col: 'autoflag', priority: 'high' },
   { id: 2,  text: 'Fix COB install sheet', cat: 'autoflag', col: 'autoflag', priority: 'medium' },
@@ -416,18 +429,12 @@ const DEFAULT_TASKS = [
   { id: 24, text: 'Fix water drip master sink', cat: 'home', col: 'home', priority: 'medium' },
   { id: 25, text: '14" tall planters for crops', cat: 'home', col: 'home', priority: 'low' },
 ];
-
 let tasks = [], categories = [], completionLog = [], taskOrder = {};
 let nextId = 100, nextCatId = 50;
 let dragId = null, dragColId = null, editingId = null, editingCatId = null, chartInstance = null;
 let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
-
-// People list — expandable
-// People list — add names here to expand (or use Manage People in the UI)
 let PEOPLE = ['Phil', 'Trinity', 'Austen'];
-
-// Default assignee by category
 function getDefaultAssignee(catId) {
   const cat = getCatById(catId);
   const label = (cat ? cat.label : catId).toLowerCase();
@@ -435,7 +442,6 @@ function getDefaultAssignee(catId) {
   if (label === 'austen' || label === 'austin') return 'Austen';
   return 'Phil';
 }
-
 function load() {
   try {
     tasks = JSON.parse(localStorage.getItem('phil-tasks-v6') || 'null') || JSON.parse(JSON.stringify(DEFAULT_TASKS));
@@ -452,14 +458,12 @@ function load() {
     completionLog = [];
   }
 }
-
 function showSyncNotice(msg) {
   const el = document.getElementById('save-notice');
   el.textContent = msg;
   clearTimeout(el._t);
   el._t = setTimeout(() => el.textContent = '', 2000);
 }
-
 function save() {
   localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
   localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
@@ -477,7 +481,6 @@ function save() {
     showSyncNotice('Saved locally ✓');
   }
 }
-
 function getCatById(id) { return categories.find(c => c.id === id); }
 function getCatLabel(id) { return (getCatById(id) || {}).label || id; }
 function getCatIcon(id) { return (getCatById(id) || {}).icon || '📁'; }
@@ -488,7 +491,6 @@ function getCatColor(id) {
   return COLOR_PALETTE[hash % COLOR_PALETTE.length];
 }
 function getBadgeStyle(id) { const c = getCatColor(id); return `background:${c.bg};color:${c.color};`; }
-
 function updateStats() {
   document.getElementById('s-total').textContent = tasks.length;
   document.getElementById('s-done').textContent = tasks.filter(t => t.col === 'done').length;
@@ -496,7 +498,6 @@ function updateStats() {
   document.getElementById('s-alltime').textContent = completionLog.length;
   document.getElementById('s-pct').textContent = tasks.length ? Math.round(tasks.filter(t => t.col === 'done').length / tasks.length * 100) + '%' : '0%';
 }
-
 function setNewPriority(p) {
   newTaskPriority = p;
   ['high','medium','low'].forEach(x => { document.getElementById('pb-' + x).className = 'priority-btn' + (x === p ? ' selected-' + x : ''); });
@@ -512,7 +513,6 @@ function cyclePriority(taskId) {
   tk.priority = order[(order.indexOf(tk.priority || 'medium') + 1) % 3];
   save(); renderAll();
 }
-
 const P_ORDER = { high: 0, medium: 1, low: 2 };
 function sortTasks(arr, colId) {
   const mode = document.getElementById('sort-select').value;
@@ -531,7 +531,6 @@ function sortTasks(arr, colId) {
   else copy.sort((a,b) => a.id - b.id);
   return copy;
 }
-
 function toggleCatPanel() {
   catPanelOpen = !catPanelOpen;
   document.getElementById('cat-panel').classList.toggle('open', catPanelOpen);
@@ -541,7 +540,7 @@ function toggleCatPanel() {
 function renderCatList() {
   document.getElementById('cat-list').innerHTML = categories.map(cat => {
     const count = tasks.filter(t => t.col === cat.id).length;
-    return `<div class="cat-chip"><span>${cat.icon}</span><span>${cat.label}</span><span class="chip-count">${count}</span><button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button><button class="chip-del" onclick="removeCategory('${cat.id}')">×</button></div>`;
+    return `<div class="cat-chip"><span>${cat.icon}</span><span>${escapeHtml(cat.label)}</span><span class="chip-count">${count}</span><button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button><button class="chip-del" onclick="removeCategory('${cat.id}')">×</button></div>`;
   }).join('');
 }
 function addCategory() {
@@ -583,17 +582,15 @@ function rebuildCatSelects() {
     const sel = document.getElementById(id);
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon} ${c.label}</option>`).join('');
+    sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon} ${escapeHtml(c.label)}</option>`).join('');
     if (cur && categories.find(c => c.id === cur)) sel.value = cur;
   });
 }
-
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
-
 function timeTaken(addedIso, completedIso) {
   if (!addedIso || !completedIso) return '';
   const ms = new Date(completedIso) - new Date(addedIso);
@@ -606,20 +603,17 @@ function timeTaken(addedIso, completedIso) {
   if (hrs > 0) return `${hrs}h ${mins}m to complete`;
   return `${mins}m to complete`;
 }
-
 function moveTask(tk, targetColId) {
   if (targetColId === 'done') {
     const now = new Date().toISOString();
     if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
-    tk.completedAt = now;
-    tk.col = 'done';
+    tk.completedAt = now; tk.col = 'done';
   } else if (targetColId === 'pending') {
     tk.col = 'pending';
   } else {
     tk.col = targetColId; tk.cat = targetColId;
   }
 }
-
 function reorderWithinCol(colId, movedId, targetId, insertBefore) {
   const colTaskIds = (taskOrder[colId] || tasks.filter(t => t.col === colId).map(t => t.id));
   const all = [...new Set([...colTaskIds, ...tasks.filter(t => t.col === colId).map(t => t.id)])];
@@ -630,12 +624,10 @@ function reorderWithinCol(colId, movedId, targetId, insertBefore) {
   else filtered.splice(targetIdx + 1, 0, movedId);
   taskOrder[colId] = filtered;
 }
-
 function renderAll() {
   const wrap = document.getElementById('columns-wrap');
   wrap.innerHTML = '';
   const boardCols = [...categories, { id: 'pending', label: 'Pending', icon: '⏳' }];
-
   boardCols.forEach(col => {
     const colTasks = sortTasks(tasks.filter(t => t.col === col.id), col.id);
     const isPending = col.id === 'pending';
@@ -645,14 +637,13 @@ function renderAll() {
     div.dataset.col = col.id;
     div.innerHTML = `
       <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;"` : ''}>
-        <div class="col-icon" style="background:${iconBg};${col.url ? 'cursor:pointer;border-bottom:2px solid #6366f1;border-radius:6px 6px 0 0;' : ''}" ${col.url ? `onclick="event.stopPropagation();window.open('${col.url}','_blank')" title="Open: ${col.url}"` : ''}>${col.icon}</div>
-        <span class="col-title">${col.label}</span>
-        ${col.url ? `<a href="${col.url}" target="_blank" onclick="event.stopPropagation()" title="${col.url}" style="color:#6366f1;opacity:0.6;display:flex;align-items:center;flex-shrink:0;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
+        <div class="col-icon" style="background:${iconBg};${col.url ? 'cursor:pointer;border-bottom:2px solid #6366f1;border-radius:6px 6px 0 0;' : ''}" ${col.url ? `onclick="event.stopPropagation();window.open('${escapeHtml(col.url)}','_blank')" title="Open: ${escapeHtml(col.url)}"` : ''}>${col.icon}</div>
+        <span class="col-title">${escapeHtml(col.label)}</span>
+        ${col.url ? `<a href="${escapeHtml(col.url)}" target="_blank" onclick="event.stopPropagation()" style="color:#6366f1;opacity:0.6;display:flex;align-items:center;flex-shrink:0;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
         <span class="col-count">${colTasks.length}</span>
       </div>
       <div class="task-list" id="list-${col.id}">${colTasks.length === 0 ? '<div class="drop-hint">Drop here</div>' : ''}</div>`;
     wrap.appendChild(div);
-
     if (!isPending) {
       const header = div.querySelector('.col-header');
       header.addEventListener('dragstart', e => {
@@ -665,7 +656,6 @@ function renderAll() {
         document.querySelectorAll('.col').forEach(c => c.classList.remove('col-drag-over'));
       });
     }
-
     const list = div.querySelector('.task-list');
     colTasks.forEach(task => {
       const p = task.priority || 'medium';
@@ -675,37 +665,31 @@ function renderAll() {
         <div class="check"><svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <div class="task-body">
           <div style="display:flex;align-items:flex-start;gap:3px;">
-            <span class="task-text">${task.text}</span>
-            ${task.url ? `<a class="task-link" href="${task.url}" target="_blank" title="${task.url}" onclick="event.stopPropagation()"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
-            ${task.phone ? `<a class="task-link" href="tel:${task.phone}" title="${task.phone}" onclick="event.stopPropagation()" style="color:#16a34a;">📞</a>` : ''}
+            <span class="task-text">${escapeHtml(task.text)}</span>
+            ${task.url ? `<a class="task-link" href="${escapeHtml(task.url)}" target="_blank" onclick="event.stopPropagation()"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
+            ${task.phone ? `<a class="task-link" href="tel:${escapeHtml(task.phone)}" onclick="event.stopPropagation()" style="color:#16a34a;">📞</a>` : ''}
           </div>
           <div class="task-meta">
-            <span class="cat-badge" style="${getBadgeStyle(task.cat)}">${getCatIcon(task.cat)} ${getCatLabel(task.cat)}</span>
+            <span class="cat-badge" style="${getBadgeStyle(task.cat)}">${getCatIcon(task.cat)} ${escapeHtml(getCatLabel(task.cat))}</span>
             <span class="priority-pill p-${p}" title="Click to cycle priority">${p}</span>
-            <span class="assignee-badge">👤 ${task.assignee || getDefaultAssignee(task.cat)}</span>
-            ${task.notes ? `<span style="font-size:10px;color:#94a3b8;" title="${task.notes.replace(/"/g,'&quot;')}">📝</span>` : ''}
+            <span class="assignee-badge">👤 ${escapeHtml(task.assignee || getDefaultAssignee(task.cat))}</span>
+            ${task.notes ? `<span style="font-size:10px;color:#94a3b8;" title="${escapeHtml(task.notes)}">📝</span>` : ''}
           </div>
           ${task.dateAdded ? `<div class="task-date">Added ${fmtDate(task.dateAdded)}</div>` : ''}
         </div>`;
-
       t.querySelector('.check').addEventListener('click', e => {
         e.stopPropagation();
         const tk = tasks.find(x => x.id === task.id);
         const now = new Date().toISOString();
         completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
-        tk.col = 'done';
-        tk.completedAt = now;
+        tk.col = 'done'; tk.completedAt = now;
         save(); renderAll(); renderDone(); updateStats(); renderHistory();
       });
       t.querySelector('.priority-pill').addEventListener('click', e => { e.stopPropagation(); cyclePriority(task.id); });
-
-      // Double-click anywhere on card to edit (desktop)
       t.addEventListener('dblclick', e => {
         if (e.target.closest('.check') || e.target.closest('.priority-pill') || e.target.closest('.task-link')) return;
         e.stopPropagation(); openModal(task.id);
       });
-
-      // Right-click (desktop) + long-press (mobile) context menu
       t.addEventListener('contextmenu', e => { e.preventDefault(); openCtxMenu(e.clientX, e.clientY, task.id); });
       let tapTimer = null;
       t.addEventListener('touchstart', e => {
@@ -713,7 +697,6 @@ function renderAll() {
       }, { passive: true });
       t.addEventListener('touchend', () => { if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; } });
       t.addEventListener('touchmove', () => { if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; } });
-
       t.addEventListener('dragstart', e => {
         dragId = task.id; dragColId = null;
         setTimeout(() => t.classList.add('dragging'), 0);
@@ -724,7 +707,6 @@ function renderAll() {
         document.querySelectorAll('.col').forEach(c => c.classList.remove('drag-over'));
         document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
       });
-
       if (document.getElementById('sort-select').value === 'manual') {
         t.addEventListener('dragover', e => {
           if (dragId === null || dragId === task.id || dragColId !== null) return;
@@ -750,7 +732,6 @@ function renderAll() {
       }
       list.appendChild(t);
     });
-
     div.addEventListener('dragover', e => {
       e.preventDefault();
       if (dragColId !== null && dragColId !== col.id && !isPending) {
@@ -775,18 +756,13 @@ function renderAll() {
       }
     });
   });
-
   updateStats();
 }
-
 function renderDone() {
   const doneTasks = tasks.filter(t => t.col === 'done')
-    .sort((a, b) => {
-      const at = a.completedAt || a.dateAdded || '';
-      const bt = b.completedAt || b.dateAdded || '';
-      return bt.localeCompare(at); // newest first
-    });
+    .sort((a, b) => { const at = a.completedAt || a.dateAdded || ''; const bt = b.completedAt || b.dateAdded || ''; return bt.localeCompare(at); });
   const el = document.getElementById('done-list');
+  if (!el) return;
   if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
   el.innerHTML = doneTasks.map(task => {
     const taken = task.dateAdded && task.completedAt ? timeTaken(task.dateAdded, task.completedAt) : '';
@@ -797,18 +773,17 @@ function renderDone() {
         <svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div style="flex:1;min-width:0;">
-        <span class="done-text">${task.text}</span>
+        <span class="done-text">${escapeHtml(task.text)}</span>
         <div class="task-meta" style="margin-top:3px;">
-          <span class="cat-badge" style="${getBadgeStyle(task.cat)};font-size:9px;">${getCatLabel(task.cat)}</span>
+          <span class="cat-badge" style="${getBadgeStyle(task.cat)};font-size:9px;">${escapeHtml(getCatLabel(task.cat))}</span>
           <span class="priority-pill p-${task.priority||'medium'}" style="font-size:9px;">${task.priority||'medium'}</span>
-          ${task.assignee ? `<span style="font-size:9px;color:#64748b;">👤 ${task.assignee}</span>` : ''}
+          ${task.assignee ? `<span style="font-size:9px;color:#64748b;">👤 ${escapeHtml(task.assignee)}</span>` : ''}
         </div>
         ${completedStr || taken ? `<div style="font-size:9px;color:#bbb;margin-top:2px;">${completedStr}${taken ? ` · ${taken}` : ''}</div>` : ''}
       </div>
     </div>`;
   }).join('');
 }
-
 function undoneTask(id) {
   const tk = tasks.find(t => t.id === id);
   if (!tk) return;
@@ -817,7 +792,6 @@ function undoneTask(id) {
   if (idx !== -1) completionLog.splice(idx, 1);
   save(); renderAll(); renderDone(); updateStats(); renderHistory();
 }
-
 function renderHistory() {
   const el = document.getElementById('log-list');
   if (completionLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
@@ -825,7 +799,7 @@ function renderHistory() {
     el.innerHTML = completionLog.slice(0, 60).map((l, idx) => {
       const d = new Date(l.completedAt);
       const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${idx})" title="Double-click to restore this task"><span class="log-text">${l.text}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${getCatLabel(l.cat)}</span></div></div>`;
+      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${idx})" title="Double-click to restore this task"><span class="log-text">${escapeHtml(l.text)}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${escapeHtml(getCatLabel(l.cat))}</span></div></div>`;
     }).join('');
   }
   const ctx = document.getElementById('monthly-chart').getContext('2d');
@@ -853,11 +827,8 @@ function renderHistory() {
     data: { labels: months.map(m => m.label), datasets: [{ data: months.map(m => m.count), backgroundColor: months.map((_,i) => i === 0 ? '#6366f1' : '#c7d2fe'), borderRadius: 6, borderSkipped: false }] },
     options: { responsive: false, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} completed` } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f0ede6' } }, x: { ticks: { font: { size: 11 } }, grid: { display: false } } } }
   });
-  ctx.canvas.width = 900;
-  ctx.canvas.height = 220;
-  chartInstance.resize();
+  ctx.canvas.width = 900; ctx.canvas.height = 220; chartInstance.resize();
 }
-
 function addTask() {
   const text = document.getElementById('new-task-text').value.trim();
   const cat = document.getElementById('new-task-cat').value;
@@ -869,31 +840,24 @@ function addTask() {
   document.getElementById('new-task-text').value = '';
   save(); renderAll(); updateStats();
 }
-
 document.getElementById('new-task-text').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
-
-// Letter-key navigation on category dropdown
 document.getElementById('new-task-cat').addEventListener('keydown', e => {
   const key = e.key.toLowerCase();
   if (key.length !== 1 || e.ctrlKey || e.metaKey) return;
   e.preventDefault();
   const sel = document.getElementById('new-task-cat');
   const opts = Array.from(sel.options);
-  // Find all options starting with this letter
   const matches = opts.filter(o => getCatLabel(o.value).toLowerCase().startsWith(key));
   if (matches.length === 0) return;
-  // Cycle through matches if same key pressed again
   const curIdx = matches.findIndex(o => o.value === sel.value);
   const next = matches[(curIdx + 1) % matches.length];
   sel.value = next.value;
 });
-
 function clearDone() {
   if (!confirm('Remove all tasks from Done?')) return;
   tasks = tasks.filter(t => t.col !== 'done');
   save(); renderAll(); renderDone(); updateStats();
 }
-
 function openModal(id) {
   editingId = id;
   const task = tasks.find(t => t.id === id);
@@ -928,10 +892,8 @@ function deleteTask() {
   tasks = tasks.filter(t => t.id !== editingId);
   closeModal(); save(); renderAll(); updateStats();
 }
-
 document.getElementById('modal').addEventListener('click', e => { if (e.target === document.getElementById('modal')) closeModal(); });
 document.getElementById('cat-modal').addEventListener('click', e => { if (e.target === document.getElementById('cat-modal')) closeCatModal(); });
-
 function exportData() {
   const data = { version: 'philinity-v6', exportedAt: new Date().toISOString(), tasks, categories, completionLog, taskOrder, nextId, nextCatId };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -942,7 +904,6 @@ function exportData() {
   URL.revokeObjectURL(url);
   showSyncNotice(`Exported philinity-tasks-${date}.json ✓`);
 }
-
 function importData(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -962,16 +923,13 @@ function importData(event) {
   reader.readAsText(file);
   event.target.value = '';
 }
-
-// ---- Context Menu ----
 let ctxTaskId = null;
-
 function openCtxMenu(x, y, taskId) {
   ctxTaskId = taskId;
   const tk = tasks.find(t => t.id === taskId);
   document.getElementById('ctx-title').textContent = tk.text.length > 30 ? tk.text.slice(0, 30) + '…' : tk.text;
   const sub = document.getElementById('ctx-submenu');
-  sub.innerHTML = categories.map(cat => `<div class="ctx-item" onclick="ctxMoveTo('${cat.id}')"><span class="ctx-icon">${cat.icon}</span> ${cat.label}</div>`).join('');
+  sub.innerHTML = categories.map(cat => `<div class="ctx-item" onclick="ctxMoveTo('${cat.id}')"><span class="ctx-icon">${cat.icon}</span> ${escapeHtml(cat.label)}</div>`).join('');
   sub.classList.remove('open');
   const menu = document.getElementById('ctx-menu');
   menu.classList.add('open');
@@ -1027,63 +985,49 @@ function ctxDelete() {
   tasks = tasks.filter(t => t.id !== ctxTaskId);
   closeCtxMenu(); save(); renderAll(); updateStats();
 }
-
 function toggleManagePeople() {
   const row = document.getElementById('manage-people-row');
   const showing = row.style.display === 'flex';
   row.style.display = showing ? 'none' : 'flex';
   if (!showing) renderPeopleChips();
 }
-
 function renderPeopleChips() {
   document.getElementById('people-chips').innerHTML = PEOPLE.map(p =>
     `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:12px;background:#f4f3ee;font-size:11px;font-weight:500;">
-      ${p}
-      ${PEOPLE.length > 1 ? `<button onclick="removePerson('${p}')" style="border:none;background:none;cursor:pointer;color:#ccc;font-size:13px;line-height:1;padding:0;" title="Remove">×</button>` : ''}
+      ${escapeHtml(p)}
+      ${PEOPLE.length > 1 ? `<button onclick="removePerson('${escapeHtml(p)}')" style="border:none;background:none;cursor:pointer;color:#ccc;font-size:13px;line-height:1;padding:0;">×</button>` : ''}
     </span>`
   ).join('');
 }
-
 function addPerson() {
   const name = document.getElementById('new-person-name').value.trim();
   if (!name || PEOPLE.includes(name)) return;
   PEOPLE.push(name);
   document.getElementById('new-person-name').value = '';
-  save(); renderPeopleChips(); renderPersonStats();
-  rebuildAssigneeSelects();
+  save(); renderPeopleChips(); renderPersonStats(); rebuildAssigneeSelects();
 }
-
 function removePerson(name) {
   if (!confirm(`Remove ${name} from the people list?`)) return;
   PEOPLE = PEOPLE.filter(p => p !== name);
-  save(); renderPeopleChips(); renderPersonStats();
-  rebuildAssigneeSelects();
+  save(); renderPeopleChips(); renderPersonStats(); rebuildAssigneeSelects();
 }
-
 function rebuildAssigneeSelects() {
   const sel = document.getElementById('edit-assignee');
   if (!sel) return;
   const cur = sel.value;
-  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === cur ? 'selected' : ''}>${p}</option>`).join('');
+  sel.innerHTML = PEOPLE.map(p => `<option value="${escapeHtml(p)}" ${p === cur ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
 }
-
 function buildAssigneeSelect(selId, current) {
   const sel = document.getElementById(selId);
   if (!sel) return;
-  sel.innerHTML = PEOPLE.map(p => `<option value="${p}" ${p === current ? 'selected' : ''}>${p}</option>`).join('');
+  sel.innerHTML = PEOPLE.map(p => `<option value="${escapeHtml(p)}" ${p === current ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
 }
-
-// ---- Person Stats Panel ----
 function togglePersonPanel() {
   personPanelOpen = !personPanelOpen;
   document.getElementById('person-panel').classList.toggle('open', personPanelOpen);
   document.getElementById('person-panel-btn').textContent = personPanelOpen ? '👥 Person Stats ▴' : '👥 Person Stats ▾';
-  if (personPanelOpen) {
-    buildMonthSelect();
-    renderPersonStats();
-  }
+  if (personPanelOpen) { buildMonthSelect(); renderPersonStats(); }
 }
-
 function buildMonthSelect() {
   const sel = document.getElementById('person-month-select');
   const now = new Date();
@@ -1096,27 +1040,20 @@ function buildMonthSelect() {
   }
   sel.innerHTML = opts.join('');
 }
-
 function renderPersonStats() {
   const sel = document.getElementById('person-month-select');
   const monthKey = sel ? sel.value : '';
   const grid = document.getElementById('person-grid');
-
-  // Count ALL active tasks per person (not filtered by month)
   const assigned = {};
   PEOPLE.forEach(p => { assigned[p] = 0; });
-
   tasks.forEach(tk => {
-    if (tk.col === 'done') return; // don't count done tasks in active
+    if (tk.col === 'done') return;
     const person = tk.assignee || getDefaultAssignee(tk.cat);
     if (assigned[person] !== undefined) assigned[person]++;
     else assigned[person] = 1;
   });
-
-  // Count completions for selected month from completionLog
   const completed = {};
   PEOPLE.forEach(p => { completed[p] = 0; });
-
   completionLog.forEach(l => {
     if (!l.completedAt) return;
     const key = l.completedAt.slice(0, 7);
@@ -1125,8 +1062,6 @@ function renderPersonStats() {
     if (completed[person] !== undefined) completed[person]++;
     else completed[person] = 1;
   });
-
-  // Also count done tasks that have completedAt in selected month
   tasks.filter(t => t.col === 'done' && t.completedAt).forEach(tk => {
     const key = tk.completedAt.slice(0, 7);
     if (key !== monthKey) return;
@@ -1134,63 +1069,38 @@ function renderPersonStats() {
     if (completed[person] !== undefined) completed[person]++;
     else completed[person] = 1;
   });
-
   const allPeople = [...new Set([...PEOPLE, ...Object.keys(assigned)])];
   grid.innerHTML = allPeople.map(p => `
     <div class="person-card">
-      <div class="person-card-name">${p}</div>
+      <div class="person-card-name">${escapeHtml(p)}</div>
       <div class="person-card-num">${assigned[p] || 0}</div>
       <div class="person-card-label">active tasks</div>
       <div style="font-size:13px;font-weight:700;color:#4caf50;margin-top:4px;">${completed[p] || 0}</div>
       <div class="person-card-label">completed this month</div>
     </div>`).join('');
 }
-
 function migrateAustinToAusten() {
   let fixed = 0;
-  tasks.forEach(tk => {
-    if (tk.assignee === 'Austin') { tk.assignee = 'Austen'; fixed++; }
-  });
-  completionLog.forEach(l => {
-    if (l.assignee === 'Austin') { l.assignee = 'Austen'; fixed++; }
-  });
+  tasks.forEach(tk => { if (tk.assignee === 'Austin') { tk.assignee = 'Austen'; fixed++; } });
+  completionLog.forEach(l => { if (l.assignee === 'Austin') { l.assignee = 'Austen'; fixed++; } });
   PEOPLE = PEOPLE.map(p => p === 'Austin' ? 'Austen' : p);
-  if (fixed > 0) {
-    save();
-    alert(`Fixed ${fixed} record(s) — Austin → Austen ✓`);
-    renderAll(); renderDone(); renderPersonStats();
-  } else {
-    alert('No Austin records found — already clean!');
-  }
+  if (fixed > 0) { save(); alert(`Fixed ${fixed} record(s) — Austin → Austen ✓`); renderAll(); renderDone(); renderPersonStats(); }
+  else { alert('No Austin records found — already clean!'); }
 }
-
-// ---- Restore from log ----
 let restoringLogIdx = null;
-
 function openRestoreModal(idx) {
   restoringLogIdx = idx;
   const l = completionLog[idx];
   document.getElementById('restore-task-name').textContent = `"${l.text}"`;
   const sel = document.getElementById('restore-cat');
-  sel.innerHTML = categories.map(c => `<option value="${c.id}" ${c.id === l.cat ? 'selected' : ''}>${c.icon} ${c.label}</option>`).join('');
+  sel.innerHTML = categories.map(c => `<option value="${c.id}" ${c.id === l.cat ? 'selected' : ''}>${c.icon} ${escapeHtml(c.label)}</option>`).join('');
   document.getElementById('restore-modal').classList.add('open');
 }
-function closeRestoreModal() {
-  document.getElementById('restore-modal').classList.remove('open');
-  restoringLogIdx = null;
-}
+function closeRestoreModal() { document.getElementById('restore-modal').classList.remove('open'); restoringLogIdx = null; }
 function confirmRestore() {
   const l = completionLog[restoringLogIdx];
   const catId = document.getElementById('restore-cat').value;
-  const newTask = {
-    id: nextId++,
-    text: l.text,
-    cat: catId,
-    col: catId,
-    priority: 'medium',
-    assignee: l.assignee || getDefaultAssignee(catId),
-    dateAdded: new Date().toISOString(),
-  };
+  const newTask = { id: nextId++, text: l.text, cat: catId, col: catId, priority: 'medium', assignee: l.assignee || getDefaultAssignee(catId), dateAdded: new Date().toISOString() };
   tasks.push(newTask);
   if (!taskOrder[catId]) taskOrder[catId] = [];
   taskOrder[catId].unshift(newTask.id);
@@ -1199,8 +1109,6 @@ function confirmRestore() {
   save(); rebuildCatSelects(); renderAll(); updateStats(); renderHistory();
 }
 document.getElementById('restore-modal').addEventListener('click', e => { if (e.target === document.getElementById('restore-modal')) closeRestoreModal(); });
-
-// ---- Verse of the hour ----
 const VERSES = [
   { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
   { text: "Commit to the Lord whatever you do, and he will establish your plans.", ref: "Proverbs 16:3" },
@@ -1227,7 +1135,6 @@ const VERSES = [
   { text: "In all your ways submit to him, and he will make your paths straight.", ref: "Proverbs 3:6" },
   { text: "The Lord is my shepherd; I shall not want.", ref: "Psalm 23:1" },
 ];
-
 function showVerse() {
   const hour = new Date().getHours();
   const idx = hour % VERSES.length;
@@ -1236,11 +1143,9 @@ function showVerse() {
   if (el) el.innerHTML = `"${v.text}" <span style="font-style:normal;font-weight:600;color:#c4b5d0;">— ${v.ref}</span>`;
 }
 showVerse();
-setInterval(showVerse, 60 * 60 * 1000); // refresh every hour
-
+setInterval(showVerse, 60 * 60 * 1000);
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
 </script>
-
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.1</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.2 — XSS Security Patch</div>
 </body>
 </html>
