@@ -143,10 +143,19 @@ onValue(dataRef, (snapshot) => {
     .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; }
     .top-bar button { min-height: 40px; font-size: 13px; padding: 9px 12px; }
     .priority-btn { min-height: 40px; font-size: 12px; padding: 9px 10px; }
-    .col { min-width: 160px; width: 160px; }
-    .task { padding: 10px; }
-    .task-text { font-size: 13px; }
-    .check { width: 20px; height: 20px; }
+    /* Full width single column on mobile */
+    .columns-wrap { flex-direction: column; overflow-x: visible; gap: 0; }
+    .col { min-width: 100%; width: 100%; margin-bottom: 0; }
+    .col.mobile-hidden { display: none; }
+    #mobile-col-picker { display: block !important; }
+    .mobile-tab { padding: 8px 14px; border-radius: 20px; border: 1.5px solid #e0ddd6; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 5px; }
+    .mobile-tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .task { padding: 12px 10px; }
+    .task-text { font-size: 14px; }
+    .check { width: 22px; height: 22px; flex-shrink: 0; }
+    .priority-pill { font-size: 11px; padding: 3px 8px; }
+    .cat-badge { font-size: 11px; padding: 3px 8px; }
+    .assignee-badge { font-size: 11px; padding: 3px 8px; }
     .mid-row { flex-direction: column; align-items: flex-start; gap: 10px; }
     .verse-box { min-width: unset; width: 100%; border-left: none; border-top: 2px solid #e0ddd6; padding-left: 0; padding-top: 10px; font-size: 12px; }
     .stats { gap: 6px; }
@@ -212,7 +221,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.5</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.6</div>
   </div>
 </div>
 <script>
@@ -286,6 +295,10 @@ async function checkPW() {
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
 </div>
 <div class="save-notice" id="save-notice"></div>
+<!-- MOBILE COLUMN PICKER -->
+<div id="mobile-col-picker" style="display:none;margin-bottom:10px;">
+  <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;" id="mobile-col-tabs"></div>
+</div>
 <!-- BOARD -->
 <div class="columns-wrap" id="columns-wrap"></div>
 <!-- MID -->
@@ -486,6 +499,8 @@ const DEFAULT_TASKS = [
 let tasks = [], categories = [], completionLog = [], taskOrder = {};
 let nextId = 100, nextCatId = 50;
 let dragId = null, dragColId = null, editingId = null, editingCatId = null, chartInstance = null;
+let activeMobileCol = null;
+window.addEventListener('resize', () => { if (typeof renderAll === 'function') renderAll(); });
 let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
 let PEOPLE = ['Phil', 'Trinity', 'Austen'];
@@ -682,12 +697,30 @@ function renderAll() {
   const wrap = document.getElementById('columns-wrap');
   wrap.innerHTML = '';
   const boardCols = [...categories, { id: 'pending', label: 'Pending', icon: '⏳' }];
+  const isMobile = window.innerWidth <= 600;
+  // Ensure activeMobileCol is valid
+  if (!activeMobileCol || !boardCols.find(c => c.id === activeMobileCol)) {
+    activeMobileCol = boardCols[0]?.id || null;
+  }
+  // Render mobile tab bar
+  if (isMobile) {
+    const tabBar = document.getElementById('mobile-col-tabs');
+    tabBar.innerHTML = '';
+    boardCols.forEach(col => {
+      const btn = document.createElement('button');
+      btn.className = 'mobile-tab' + (col.id === activeMobileCol ? ' active' : '');
+      const count = tasks.filter(t => t.col === col.id).length;
+      btn.innerHTML = col.icon + ' ' + col.label + (count ? ' <span style="opacity:0.6;font-size:11px">(' + count + ')</span>' : '');
+      btn.onclick = () => { activeMobileCol = col.id; renderAll(); };
+      tabBar.appendChild(btn);
+    });
+  }
   boardCols.forEach(col => {
     const colTasks = sortTasks(tasks.filter(t => t.col === col.id), col.id);
     const isPending = col.id === 'pending';
     const iconBg = isPending ? '#f3f4f6' : getCatColor(col.id).bg;
     const div = document.createElement('div');
-    div.className = 'col';
+    div.className = 'col' + (isMobile && col.id !== activeMobileCol ? ' mobile-hidden' : '');
     div.dataset.col = col.id;
     div.innerHTML = `
       <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;"` : ''}>
@@ -1307,6 +1340,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.6 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
