@@ -5,11 +5,12 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://firebasestorage.googleapis.com https://*.googleapis.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com; img-src 'self' data: blob: https:; frame-src 'none'; object-src 'none';">
 <title>Philinity's Task Board</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
@@ -24,6 +25,17 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 await signInAnonymously(auth);
+
+// SECURITY: Strip HTML/XSS from any string before rendering
+function stripHTML(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/<[^>]*>/g, '')
+    .replace(/javascript:/gi, '')
+    .replace(/atob\(/gi, '')
+    .replace(/eval\(/gi, '')
+    .replace(/location=/gi, '');
+}
 const dataRef = ref(db, 'philinity');
 window._fbRef = dataRef;
 window._fbSet = set;
@@ -188,6 +200,7 @@ onValue(dataRef, (snapshot) => {
     onkeydown="if(event.key==='Enter') checkPW()">
   <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:9px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Enter</button>
   <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none">Incorrect password</div>
+  <div style="margin-top:16px;font-size:11px;color:#bbb;letter-spacing:1px">Version 3.4</div>
 </div>
 <script>
 (function() {
@@ -197,8 +210,15 @@ onValue(dataRef, (snapshot) => {
     document.body.style.overflow = 'hidden';
   }
 })();
-function checkPW() {
-  if (document.getElementById('pw-input').value === '1002') {
+async function checkPW() {
+  const v = document.getElementById('pw-input').value;
+  if (!v) return;
+  let correctPW = '1002';
+  try {
+    const snap = await get(ref(db, 'config/taskboard_password'));
+    if (snap.exists()) correctPW = snap.val();
+  } catch(e) { console.warn('Using default password'); }
+  if (v === correctPW) {
     sessionStorage.setItem('taskboard_auth', 'ok');
     document.getElementById('auth-gate').style.display = 'none';
     document.body.style.overflow = '';
@@ -1148,7 +1168,171 @@ function showVerse() {
 showVerse();
 setInterval(showVerse, 60 * 60 * 1000);
 load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
+// ── DATA MANAGER ─────────────────────────────────────────
+function openDataModal() {
+  document.getElementById('tb-data-status').innerHTML = '';
+  document.getElementById('tb-restore-filename').textContent = 'No file selected';
+  document.getElementById('tb-data-modal').style.display = 'flex';
+}
+
+function closeDataModal() {
+  document.getElementById('tb-data-modal').style.display = 'none';
+}
+
+function tbBackup() {
+  var status = document.getElementById('tb-data-status');
+  try {
+    var backup = {
+      tasks: tasks,
+      categories: categories,
+      completionLog: completionLog,
+      taskOrder: taskOrder,
+      nextId: nextId,
+      nextCatId: nextCatId,
+      people: PEOPLE,
+      exportedAt: new Date().toISOString()
+    };
+    var blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    var date = new Date().toISOString().slice(0, 10);
+    a.download = 'taskboard-backup-' + date + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    status.innerHTML = '<span style="color:green">✅ Backup saved: ' + a.download + '</span>';
+  } catch(e) {
+    status.innerHTML = '<span style="color:red">❌ Error: ' + e.message + '</span>';
+  }
+}
+
+function tbExportCSV() {
+  var status = document.getElementById('tb-data-status');
+  try {
+    var cols = ['id','text','cat','col','assignee','priority','url','completedAt'];
+    var rows = [cols.join(',')];
+    // Collect all tasks from all columns
+    var allTasks = [];
+    Object.entries(tasks).forEach(function([catId, cols_]) {
+      Object.entries(cols_).forEach(function([col, taskList]) {
+        if (Array.isArray(taskList)) {
+          taskList.forEach(function(t) {
+            allTasks.push(Object.assign({}, t, {cat: catId, col: col}));
+          });
+        }
+      });
+    });
+    allTasks.forEach(function(t) {
+      rows.push(cols.map(function(c) {
+        var val = t[c] !== undefined ? String(t[c]) : '';
+        val = val.replace(/"/g, '""');
+        if (val.indexOf(',') > -1 || val.indexOf('"') > -1 || val.indexOf('
+') > -1) val = '"' + val + '"';
+        return val;
+      }).join(','));
+    });
+    var blob = new Blob([rows.join('
+')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'taskboard-tasks-' + new Date().toISOString().slice(0,10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    status.innerHTML = '<span style="color:green">✅ Exported ' + allTasks.length + ' tasks to CSV</span>';
+  } catch(e) {
+    status.innerHTML = '<span style="color:red">❌ Error: ' + e.message + '</span>';
+  }
+}
+
+function tbRestore(event) {
+  var file = event && event.target && event.target.files && event.target.files[0];
+  if (!file) return;
+  document.getElementById('tb-restore-filename').textContent = file.name;
+  var status = document.getElementById('tb-data-status');
+  status.innerHTML = '<span style="color:#888">⏳ Reading file...</span>';
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var data = JSON.parse(e.target.result);
+      if (!data.tasks) { status.innerHTML = '<span style="color:red">❌ Invalid backup file — missing tasks</span>'; return; }
+      var taskCount = Object.values(data.tasks).reduce(function(sum, cat) {
+        return sum + Object.values(cat).reduce(function(s, col) { return s + (Array.isArray(col) ? col.length : 0); }, 0);
+      }, 0);
+      if (!confirm('Restore ' + taskCount + ' tasks from "' + file.name + '"?
+
+This will overwrite all current data.')) { status.innerHTML = ''; return; }
+      // Restore all data
+      tasks = data.tasks;
+      categories = data.categories || categories;
+      completionLog = data.completionLog || [];
+      taskOrder = data.taskOrder || [];
+      nextId = data.nextId || nextId;
+      nextCatId = data.nextCatId || nextCatId;
+      if (data.people) PEOPLE = data.people;
+      save();
+      render();
+      status.innerHTML = '<span style="color:green">✅ Restored ' + taskCount + ' tasks from ' + file.name + '</span>';
+    } catch(err) {
+      status.innerHTML = '<span style="color:red">❌ Error: ' + err.message + '</span>';
+    }
+  };
+  reader.readAsText(file);
+}
+
+
 </script>
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.2 — XSS Security Patch</div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">
+  Philinity© Rev3.4
+  · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span>
+</div>
+
+<!-- DATA MODAL -->
+<div id="tb-data-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <button onclick="closeDataModal()" style="position:absolute;top:14px;right:14px;background:#f4f3ee;border:1px solid #ddd;color:#666;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">✕</button>
+    <div style="font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:4px">📦 Data Manager</div>
+    <div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Backup · Export · Restore</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+
+      <!-- Backup JSON -->
+      <div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px">📦 Full Backup (JSON)</div>
+        <div style="font-size:12px;color:#888;margin-bottom:12px">Download all tasks, categories, and data as JSON</div>
+        <button onclick="tbBackup()" style="background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download Backup</button>
+      </div>
+
+      <!-- Export CSV -->
+      <div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px">📊 Export Tasks as CSV</div>
+        <div style="font-size:12px;color:#888;margin-bottom:12px">Download all tasks as a spreadsheet — opens in Excel or Google Sheets</div>
+        <button onclick="tbExportCSV()" style="background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download CSV</button>
+      </div>
+
+      <!-- Restore JSON -->
+      <div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a;margin-bottom:3px">♻️ Restore from Backup</div>
+        <div style="font-size:12px;color:#888;margin-bottom:10px">Select a taskboard-backup-*.json file to restore</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="background:#1a1a1a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">
+            📂 Choose Backup File
+            <input type="file" accept=".json" style="display:none" onchange="tbRestore(event)">
+          </label>
+          <span id="tb-restore-filename" style="font-size:11px;color:#999;font-family:monospace">No file selected</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div id="tb-data-status" style="margin-top:14px;font-size:12px;color:#666;font-family:monospace;line-height:1.8"></div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #eee">
+      <button onclick="closeDataModal()" style="background:#f4f3ee;color:#666;border:1px solid #ddd;padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
