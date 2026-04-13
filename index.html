@@ -133,6 +133,26 @@ onValue(dataRef, (snapshot) => {
   .bottom-section { display: grid; grid-template-columns: 280px 1fr 1fr; gap: 16px; align-items: stretch; }
   @media (max-width: 900px) { .bottom-section { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 580px) { .bottom-section { grid-template-columns: 1fr; } }
+
+  /* ── MOBILE FRIENDLY ───────────────────── */
+  @media (max-width: 600px) {
+    body { padding: 0.75rem; }
+    .top-bar { gap: 6px; }
+    .top-bar h1 { font-size: 16px; }
+    .top-bar input[type="text"] { min-width: 120px; font-size: 16px; padding: 9px 10px; }
+    .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; }
+    .top-bar button { min-height: 40px; font-size: 13px; padding: 9px 12px; }
+    .priority-btn { min-height: 40px; font-size: 12px; padding: 9px 10px; }
+    .col { min-width: 160px; width: 160px; }
+    .task { padding: 10px; }
+    .task-text { font-size: 13px; }
+    .check { width: 20px; height: 20px; }
+    .mid-row { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .verse-box { min-width: unset; width: 100%; border-left: none; border-top: 2px solid #e0ddd6; padding-left: 0; padding-top: 10px; font-size: 12px; }
+    .stats { gap: 6px; }
+    .stat { padding: 0.5rem 0.7rem; min-width: 55px; }
+    .stat-num { font-size: 18px; }
+  }
   .bottom-card { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1.25rem; display: flex; flex-direction: column; }
   .bottom-card h3 { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
   .done-task-list { max-height: 320px; overflow-y: auto; flex: 1; }
@@ -182,31 +202,45 @@ onValue(dataRef, (snapshot) => {
 <body>
 
 <!-- PASSWORD GATE -->
-<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#f4f3ee;z-index:9999;align-items:center;justify-content:center;flex-direction:column;gap:16px">
-  <div style="font-size:32px">📋</div>
-  <div style="font-size:20px;font-weight:600;color:#1a1a1a">Philinity's Task Board</div>
-  <div style="font-size:13px;color:#888;margin-bottom:4px">Private — Enter password to continue</div>
-  <input type="password" id="pw-input" placeholder="Password"
-    style="background:#fff;border:0.5px solid #ddd;color:#1a1a1a;padding:10px 18px;border-radius:8px;font-size:15px;outline:none;width:240px;text-align:center"
-    onkeydown="if(event.key==='Enter') checkPW()">
-  <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:9px 28px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Enter</button>
-  <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none">Incorrect password</div>
-  <div style="margin-top:14px;font-size:11px;color:#bbb;letter-spacing:1px">Version 3.4</div>
+<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#f4f3ee;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:20px;box-sizing:border-box">
+  <div style="background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;gap:14px;box-sizing:border-box">
+    <div style="font-size:40px;line-height:1">📋</div>
+    <div style="font-size:22px;font-weight:700;color:#1a1a1a;text-align:center">Philinity's Task Board</div>
+    <div style="font-size:13px;color:#888;text-align:center">Private — Enter password to continue</div>
+    <input type="password" id="pw-input" placeholder="Password"
+      style="background:#f4f3ee;border:1.5px solid #ddd;color:#1a1a1a;padding:14px 18px;border-radius:10px;font-size:16px;outline:none;width:100%;text-align:center;box-sizing:border-box;-webkit-appearance:none"
+      onkeydown="if(event.key==='Enter') checkPW()">
+    <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
+    <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.5</div>
+  </div>
 </div>
 <script>
+const TB_AUTH_KEY = 'taskboard_auth_v2';
+const TB_AUTH_EXPIRY_DAYS = 30;
+
+function isTBAuthValid() {
+  try {
+    var stored = localStorage.getItem(TB_AUTH_KEY);
+    if (!stored) return false;
+    var data = JSON.parse(stored);
+    return (Date.now() - data.ts) < (TB_AUTH_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+  } catch(e) { return false; }
+}
+
 (function() {
-  var ok = sessionStorage.getItem('taskboard_auth') === 'ok';
-  if (!ok) {
+  if (!isTBAuthValid()) {
     document.getElementById('auth-gate').style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    setTimeout(function() { document.getElementById('pw-input').focus(); }, 300);
   }
 })();
+
 async function checkPW() {
   var v = document.getElementById('pw-input').value;
   if (!v) return;
   var correctPW = '1002';
   try {
-    // Wait for Firebase module to be ready
     var waited = 0;
     while (!window._fbGet && waited < 3000) { await new Promise(r => setTimeout(r, 100)); waited += 100; }
     if (window._fbGet && window._fbRefFn) {
@@ -215,12 +249,13 @@ async function checkPW() {
     }
   } catch(e) { console.warn('Using default password', e.message); }
   if (v === correctPW) {
-    sessionStorage.setItem('taskboard_auth', 'ok');
+    localStorage.setItem(TB_AUTH_KEY, JSON.stringify({ ts: Date.now() }));
     document.getElementById('auth-gate').style.display = 'none';
     document.body.style.overflow = '';
   } else {
     document.getElementById('pw-error').style.display = 'block';
     document.getElementById('pw-input').value = '';
+    document.getElementById('pw-input').focus();
   }
 }
 </script>
@@ -1272,6 +1307,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
