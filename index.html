@@ -247,7 +247,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.0</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.1</div>
   </div>
 </div>
 <script>
@@ -333,7 +333,10 @@ async function checkPW() {
 <div class="columns-wrap" id="columns-wrap"></div>
 <!-- MID -->
 <div class="mid-section">
-  <div class="mid-row">
+  <!-- Bible Verse - centered at top -->
+  <div id="verse-box" style="text-align:center;font-size:13px;color:#555;font-style:italic;line-height:1.6;padding:10px 16px 12px;border-bottom:0.5px solid #e0ddd6;margin-bottom:10px;"></div>
+  <!-- Stats row -->
+  <div class="mid-row" style="margin-bottom:0;">
     <button class="manage-cats-btn" onclick="toggleCatPanel()">🗂 Manage Categories ▾</button>
     <button class="manage-cats-btn" onclick="togglePersonPanel()" id="person-panel-btn">👥 Person Stats ▾</button>
     <div class="stats">
@@ -343,8 +346,39 @@ async function checkPW() {
       <div class="stat"><div class="stat-num" id="s-alltime" style="color:#6366f1;">0</div><div class="stat-label">All-time</div></div>
       <div class="stat"><div class="stat-num" id="s-pct">0%</div><div class="stat-label">Progress</div></div>
     </div>
-    <div class="verse-box" id="verse-box"></div>
   </div>
+  <div class="person-panel" id="person-panel">
+    <div class="person-panel-header">
+      <span style="font-size:12px;font-weight:600;color:#555;">Tasks per person</span>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <select id="person-month-select" onchange="renderPersonStats()"></select>
+        <button onclick="toggleManagePeople()" id="manage-people-btn" style="padding:4px 10px;border-radius:8px;border:0.5px solid #ddd;background:#f4f3ee;font-size:12px;cursor:pointer;">+ Add Person</button>
+      </div>
+    </div>
+    <div id="manage-people-row" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+      <input type="text" id="new-person-name" placeholder="Name..." maxlength="20" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;width:140px;" />
+      <button onclick="addPerson()" style="padding:5px 12px;border-radius:8px;border:none;background:#1a1a1a;color:#fff;font-size:13px;cursor:pointer;">Add</button>
+      <span style="font-size:11px;color:#aaa;">Current: </span>
+      <div id="people-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+      <button onclick="migrateAustinToAusten()" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fcd34d;background:#fefce8;color:#92400e;font-size:11px;cursor:pointer;">🔧 Fix Austin→Austen</button>
+    </div>
+    <div class="person-grid" id="person-grid"></div>
+  </div>
+  <div class="cat-panel" id="cat-panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+      <label style="font-size:12px;color:#888;display:flex;align-items:center;gap:5px;cursor:pointer;">
+        <input type="checkbox" id="show-archived-toggle" onchange="renderCatList()" style="cursor:pointer;">
+        Show archived categories
+      </label>
+    </div>
+    <div class="cat-list" id="cat-list"></div>
+    <div class="add-cat-row">
+      <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
+      <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #ddd;border-radius:8px;background:#fff;" />
+      <button onclick="addCategory()">+ Add Category</button>
+    </div>
+  </div>
+</div>
   <div class="person-panel" id="person-panel">
     <div class="person-panel-header">
       <span style="font-size:12px;font-weight:600;color:#555;">Tasks per person</span>
@@ -1553,6 +1587,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.0 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.1 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
