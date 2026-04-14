@@ -121,11 +121,20 @@ onValue(dataRef, (snapshot) => {
   .cat-panel.open { display: block; }
   .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
   .cat-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; border: 0.5px solid #e0ddd6; background: #fafaf8; font-size: 12px; font-weight: 500; }
+  .cat-chip.archived-chip { opacity: 0.5; background: #f0ede6; border-style: dashed; }
   .cat-chip .chip-count { font-size: 10px; color: #aaa; }
   .cat-chip .chip-edit { cursor: pointer; color: #ccc; font-size: 11px; border: none; background: none; padding: 0 2px; }
   .cat-chip .chip-edit:hover { color: #6366f1; }
+  .cat-chip .chip-archive { cursor: pointer; color: #ccc; font-size: 13px; border: none; background: none; padding: 0 2px; title: "Archive"; }
+  .cat-chip .chip-archive:hover { color: #f59e0b; }
   .cat-chip .chip-del { cursor: pointer; color: #ccc; font-size: 15px; line-height: 1; border: none; background: none; padding: 0; }
   .cat-chip .chip-del:hover { color: #e53e3e; }
+  .task-search-wrap { position: relative; display: flex; align-items: center; }
+  .task-search { padding: 6px 12px 6px 32px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; width: 180px; }
+  .task-search-icon { position: absolute; left: 10px; color: #bbb; font-size: 13px; pointer-events: none; }
+  .done-search { padding: 5px 10px 5px 28px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 12px; background: #fff; flex: 1; max-width: 200px; }
+  .done-search-wrap { position: relative; display: flex; align-items: center; }
+  .done-search-icon { position: absolute; left: 8px; color: #bbb; font-size: 11px; pointer-events: none; }
   .add-cat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .add-cat-row input[type="text"] { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
   .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; cursor: pointer; }
@@ -221,7 +230,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.6</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.8</div>
   </div>
 </div>
 <script>
@@ -288,6 +297,10 @@ async function checkPW() {
     <option value="alpha">Alphabetical</option>
     <option value="added">Date added</option>
   </select>
+  <div class="task-search-wrap">
+    <span class="task-search-icon">🔍</span>
+    <input type="text" class="task-search" id="task-search-input" placeholder="Search tasks..." oninput="applyTaskSearch()">
+  </div>
   <div style="display:flex;gap:6px;margin-left:auto;flex-shrink:0;">
     <button onclick="exportData()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">⬇ Export</button>
     <button onclick="document.getElementById('import-input').click()" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">⬆ Import</button>
@@ -333,6 +346,12 @@ async function checkPW() {
     <div class="person-grid" id="person-grid"></div>
   </div>
   <div class="cat-panel" id="cat-panel">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+      <label style="font-size:12px;color:#888;display:flex;align-items:center;gap:5px;cursor:pointer;">
+        <input type="checkbox" id="show-archived-toggle" onchange="renderCatList()" style="cursor:pointer;">
+        Show archived categories
+      </label>
+    </div>
     <div class="cat-list" id="cat-list"></div>
     <div class="add-cat-row">
       <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
@@ -342,7 +361,13 @@ async function checkPW() {
   </div>
 </div>
 <!-- BOTTOM -->
-<div class="bottom-section-title">📊 Completion History</div>
+<div class="bottom-section-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+  📊 Completion History
+  <div class="done-search-wrap">
+    <span class="done-search-icon">🔍</span>
+    <input type="text" class="done-search" id="done-search-input" placeholder="Search completed..." oninput="renderHistory()">
+  </div>
+</div>
 <div class="bottom-section" style="grid-template-columns: 0.9fr 1fr;">
   <div class="bottom-card">
     <h3>Completed tasks log <span style="font-weight:400;color:#bbb;font-size:10px;text-transform:none;letter-spacing:0;">— double-click to restore</span></h3>
@@ -381,6 +406,16 @@ async function checkPW() {
   <div class="ctx-item" onclick="ctxEdit()"><span class="ctx-icon">✏️</span> Edit / Add Link</div>
   <div class="ctx-item danger" onclick="ctxDelete()"><span class="ctx-icon">🗑</span> Delete</div>
 </div>
+<!-- Column Context Menu -->
+<div class="ctx-overlay" id="col-ctx-overlay" onclick="closeColCtxMenu()" style="display:none;position:fixed;inset:0;z-index:299;"></div>
+<div class="ctx-menu" id="col-ctx-menu" style="display:none;">
+  <div class="ctx-title" id="col-ctx-title">Category</div>
+  <div class="ctx-item" onclick="colCtxEdit()"><span class="ctx-icon">✏️</span> Edit Category</div>
+  <div class="ctx-item" onclick="colCtxArchive()"><span class="ctx-icon">📥</span> Archive (Hide from Board)</div>
+  <div class="ctx-divider"></div>
+  <div class="ctx-item danger" onclick="colCtxDelete()"><span class="ctx-icon">🗑</span> Delete Category</div>
+</div>
+
 <!-- Task Edit Modal -->
 <div class="modal-overlay" id="modal">
   <div class="modal">
@@ -607,10 +642,35 @@ function toggleCatPanel() {
   if (catPanelOpen) renderCatList();
 }
 function renderCatList() {
-  document.getElementById('cat-list').innerHTML = categories.map(cat => {
+  const showArchived = document.getElementById('show-archived-toggle')?.checked;
+  const visible = showArchived ? categories : categories.filter(c => !c.archived);
+  document.getElementById('cat-list').innerHTML = visible.map(cat => {
     const count = tasks.filter(t => t.col === cat.id).length;
-    return `<div class="cat-chip"><span>${cat.icon}</span><span>${escapeHtml(cat.label)}</span><span class="chip-count">${count}</span><button class="chip-edit" onclick="openCatModal('${cat.id}')">✏️</button><button class="chip-del" onclick="removeCategory('${cat.id}')">×</button></div>`;
+    const archiveLabel = cat.archived ? '📤 Unarchive' : '📥 Archive';
+    return `<div class="cat-chip${cat.archived ? ' archived-chip' : ''}">
+      <span>${cat.icon}</span>
+      <span>${escapeHtml(cat.label)}</span>
+      <span class="chip-count">${count}</span>
+      ${!cat.archived ? `<button class="chip-edit" onclick="openCatModal('${cat.id}')" title="Edit">✏️</button>` : ''}
+      <button class="chip-archive" onclick="toggleArchiveCategory('${cat.id}')" title="${archiveLabel}">${cat.archived ? '📤' : '📥'}</button>
+      <button class="chip-del" onclick="removeCategory('${cat.id}')" title="Delete permanently">×</button>
+    </div>`;
   }).join('');
+}
+
+function toggleArchiveCategory(id) {
+  const cat = getCatById(id);
+  if (!cat) return;
+  if (cat.archived) {
+    cat.archived = false;
+    showSyncNotice('Category restored: ' + cat.label);
+  } else {
+    const count = tasks.filter(t => t.col === id).length;
+    if (count > 0 && !confirm(`Archive "${cat.label}"? Its ${count} task(s) will stay but the column will be hidden from the board.`)) return;
+    cat.archived = true;
+    showSyncNotice('Category archived: ' + cat.label);
+  }
+  save(); renderCatList(); rebuildCatSelects(); renderAll();
 }
 function addCategory() {
   const name = document.getElementById('new-cat-name').value.trim();
@@ -696,7 +756,7 @@ function reorderWithinCol(colId, movedId, targetId, insertBefore) {
 function renderAll() {
   const wrap = document.getElementById('columns-wrap');
   wrap.innerHTML = '';
-  const boardCols = [...categories, { id: 'pending', label: 'Pending', icon: '⏳' }];
+  const boardCols = [...categories.filter(c => !c.archived), { id: 'pending', label: 'Pending', icon: '⏳' }];
   const isMobile = window.innerWidth <= 600;
   // Ensure activeMobileCol is valid
   if (!activeMobileCol || !boardCols.find(c => c.id === activeMobileCol)) {
@@ -723,7 +783,7 @@ function renderAll() {
     div.className = 'col' + (isMobile && col.id !== activeMobileCol ? ' mobile-hidden' : '');
     div.dataset.col = col.id;
     div.innerHTML = `
-      <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;"` : ''}>
+      <div class="col-header" ${!isPending ? `draggable="true" title="Drag to reorder column" style="cursor:grab;" oncontextmenu="event.preventDefault();openColCtxMenu(event,'${col.id}')"` : ''}>
         <div class="col-icon" style="background:${iconBg};${col.url ? 'cursor:pointer;border-bottom:2px solid #6366f1;border-radius:6px 6px 0 0;' : ''}" ${col.url ? `onclick="event.stopPropagation();window.open('${escapeHtml(col.url)}','_blank')" title="Open: ${escapeHtml(col.url)}"` : ''}>${col.icon}</div>
         <span class="col-title">${escapeHtml(col.label)}</span>
         ${col.url ? `<a href="${escapeHtml(col.url)}" target="_blank" onclick="event.stopPropagation()" style="color:#6366f1;opacity:0.6;display:flex;align-items:center;flex-shrink:0;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.6"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7"/><path d="M8 1h3v3"/><path d="M11 1L5.5 6.5"/></svg></a>` : ''}
@@ -883,10 +943,13 @@ function renderHistory() {
   const el = document.getElementById('log-list');
   if (completionLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
   else {
-    el.innerHTML = completionLog.slice(0, 60).map((l, idx) => {
+    const doneQ = (document.getElementById('done-search-input')?.value || '').toLowerCase().trim();
+    const filteredLog = doneQ ? completionLog.filter(l => (l.text||'').toLowerCase().includes(doneQ) || (l.cat||'').toLowerCase().includes(doneQ) || getCatLabel(l.cat||'').toLowerCase().includes(doneQ)) : completionLog;
+    el.innerHTML = filteredLog.slice(0, 60).map((l, idx) => {
       const d = new Date(l.completedAt);
       const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
-      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${idx})" title="Double-click to restore this task"><span class="log-text">${escapeHtml(l.text)}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${escapeHtml(getCatLabel(l.cat))}</span></div></div>`;
+      const realIdx = completionLog.indexOf(l);
+      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${realIdx})" title="Double-click to restore this task"><span class="log-text">${escapeHtml(l.text)}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${escapeHtml(getCatLabel(l.cat))}</span></div></div>`;
     }).join('');
   }
   const ctx = document.getElementById('monthly-chart').getContext('2d');
@@ -916,6 +979,43 @@ function renderHistory() {
   });
   ctx.canvas.width = 900; ctx.canvas.height = 220; chartInstance.resize();
 }
+let colCtxId = null;
+function openColCtxMenu(e, catId) {
+  colCtxId = catId;
+  const cat = getCatById(catId);
+  document.getElementById('col-ctx-title').textContent = (cat?.icon || '') + ' ' + (cat?.label || 'Category');
+  const archiveItem = document.getElementById('col-ctx-menu').querySelectorAll('.ctx-item')[1];
+  archiveItem.innerHTML = cat?.archived ? '<span class="ctx-icon">📤</span> Unarchive' : '<span class="ctx-icon">📥</span> Archive (Hide from Board)';
+  const menu = document.getElementById('col-ctx-menu');
+  menu.style.display = 'block';
+  document.getElementById('col-ctx-overlay').style.display = 'block';
+  let x = e.clientX, y = e.clientY;
+  setTimeout(() => {
+    const r = menu.getBoundingClientRect();
+    if (x + r.width > window.innerWidth) x = window.innerWidth - r.width - 8;
+    if (y + r.height > window.innerHeight) y = window.innerHeight - r.height - 8;
+    menu.style.left = x + 'px'; menu.style.top = y + 'px'; menu.style.position = 'fixed'; menu.style.zIndex = 300;
+  }, 0);
+}
+function closeColCtxMenu() {
+  document.getElementById('col-ctx-menu').style.display = 'none';
+  document.getElementById('col-ctx-overlay').style.display = 'none';
+  colCtxId = null;
+}
+function colCtxEdit() { closeColCtxMenu(); if (colCtxId) openCatModal(colCtxId); }
+function colCtxArchive() { const id = colCtxId; closeColCtxMenu(); if (id) toggleArchiveCategory(id); }
+function colCtxDelete() { const id = colCtxId; closeColCtxMenu(); if (id) removeCategory(id); }
+
+function applyTaskSearch() {
+  const q = (document.getElementById('task-search-input')?.value || '').toLowerCase().trim();
+  document.querySelectorAll('.task').forEach(el => {
+    const text = el.querySelector('.task-text')?.textContent?.toLowerCase() || '';
+    const badge = el.querySelector('.cat-badge')?.textContent?.toLowerCase() || '';
+    const assignee = el.querySelector('.assignee-badge')?.textContent?.toLowerCase() || '';
+    el.style.display = (!q || text.includes(q) || badge.includes(q) || assignee.includes(q)) ? '' : 'none';
+  });
+}
+
 function addTask() {
   const text = document.getElementById('new-task-text').value.trim();
   const cat = document.getElementById('new-task-cat').value;
@@ -999,12 +1099,94 @@ function importData(event) {
     try {
       const data = JSON.parse(e.target.result);
       if (!data.tasks || !data.categories) throw new Error('Invalid file');
-      if (!confirm(`Import "${file.name}"? This will replace your current board data.`)) return;
-      tasks = data.tasks; categories = data.categories;
-      completionLog = data.completionLog || []; taskOrder = data.taskOrder || {};
-      nextId = data.nextId || 100; nextCatId = data.nextCatId || 50;
-      save(); rebuildCatSelects(); renderAll(); renderHistory();
-      showSyncNotice(`Imported "${file.name}" ✓`);
+
+      const importedTaskCount = Array.isArray(data.tasks) ? data.tasks.length : 0;
+      const currentTaskCount = tasks.length;
+
+      // Show choice modal
+      const choice = window._importChoice || null;
+      window._pendingImportData = data;
+      window._pendingImportFile = file.name;
+
+      // Build a nice dialog using a custom modal
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+      overlay.innerHTML = `
+        <div style="background:#fff;border-radius:14px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+          <div style="font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">⬆ Import "${file.name}"</div>
+          <div style="font-size:13px;color:#888;margin-bottom:20px;">
+            Backup has <strong>${importedTaskCount} tasks</strong> · Your board has <strong>${currentTaskCount} tasks</strong>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px;">
+            <button id="import-overwrite-btn" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;">
+              🔄 Overwrite — Replace everything with backup
+              <div style="font-size:11px;font-weight:400;opacity:0.7;margin-top:3px;">Your current ${currentTaskCount} tasks will be replaced</div>
+            </button>
+            <button id="import-merge-btn" style="background:#f0fdf4;color:#166534;border:1.5px solid #bbf7d0;padding:14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;text-align:left;">
+              ✨ Merge — Add backup tasks to your board
+              <div style="font-size:11px;font-weight:400;opacity:0.7;margin-top:3px;">Keeps your current tasks, adds new ones from backup</div>
+            </button>
+          </div>
+          <button id="import-cancel-btn" style="background:#f4f3ee;color:#666;border:1px solid #ddd;padding:10px;border-radius:8px;font-size:13px;cursor:pointer;width:100%;">Cancel</button>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      // Cancel
+      overlay.querySelector('#import-cancel-btn').onclick = () => { document.body.removeChild(overlay); };
+      overlay.onclick = (ev) => { if (ev.target === overlay) document.body.removeChild(overlay); };
+
+      // Overwrite
+      overlay.querySelector('#import-overwrite-btn').onclick = () => {
+        document.body.removeChild(overlay);
+        tasks = data.tasks;
+        categories = data.categories;
+        completionLog = data.completionLog || [];
+        taskOrder = data.taskOrder || {};
+        nextId = data.nextId || 100;
+        nextCatId = data.nextCatId || 50;
+        save(); rebuildCatSelects(); renderAll(); renderHistory();
+        showSyncNotice(`Overwrote with "${file.name}" ✓`);
+      };
+
+      // Merge
+      overlay.querySelector('#import-merge-btn').onclick = () => {
+        document.body.removeChild(overlay);
+        // Merge categories — add any from backup not already in current
+        const existingCatIds = new Set(categories.map(c => c.id));
+        let newCatCount = 0;
+        (data.categories || []).forEach(cat => {
+          if (!existingCatIds.has(cat.id)) {
+            categories.push(cat);
+            newCatCount++;
+          }
+        });
+        // Merge tasks — add tasks from backup that don't match existing task text+cat combos
+        const existingKeys = new Set(tasks.map(t => t.text + '|' + t.cat));
+        let newTaskCount = 0;
+        (data.tasks || []).forEach(t => {
+          const key = t.text + '|' + t.cat;
+          if (!existingKeys.has(key)) {
+            // Give it a new unique ID to avoid collisions
+            const newTask = { ...t, id: nextId++ };
+            tasks.push(newTask);
+            existingKeys.add(key);
+            newTaskCount++;
+          }
+        });
+        // Merge completion log — add entries not already present
+        const existingLogKeys = new Set(completionLog.map(l => l.text + '|' + l.completedAt));
+        let newLogCount = 0;
+        (data.completionLog || []).forEach(l => {
+          const key = l.text + '|' + l.completedAt;
+          if (!existingLogKeys.has(key)) {
+            completionLog.push(l);
+            newLogCount++;
+          }
+        });
+        save(); rebuildCatSelects(); renderAll(); renderHistory();
+        showSyncNotice(`Merged: +${newTaskCount} tasks, +${newCatCount} categories ✓`);
+      };
+
     } catch(err) { alert('Could not read file. Make sure it\'s a valid Philinity export.'); }
   };
   reader.readAsText(file);
@@ -1340,6 +1522,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.6 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.8 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
