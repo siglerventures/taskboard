@@ -247,7 +247,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.3</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.4</div>
   </div>
 </div>
 <script>
@@ -630,11 +630,15 @@ function getCatColor(id) {
 }
 function getBadgeStyle(id) { const c = getCatColor(id); return `background:${c.bg};color:${c.color};`; }
 function updateStats() {
-  document.getElementById('s-total').textContent = tasks.length;
-  document.getElementById('s-done').textContent = tasks.filter(t => t.col === 'done').length;
-  document.getElementById('s-pending').textContent = tasks.filter(t => t.col === 'pending').length;
+  const activeTasks = tasks.filter(t => t.col !== 'done');
+  const doneTasks = tasks.filter(t => t.col === 'done');
+  const pendingTasks = tasks.filter(t => t.col === 'pending');
+  document.getElementById('s-total').textContent = activeTasks.length;
+  document.getElementById('s-done').textContent = doneTasks.length;
+  document.getElementById('s-pending').textContent = pendingTasks.length;
   document.getElementById('s-alltime').textContent = completionLog.length;
-  document.getElementById('s-pct').textContent = tasks.length ? Math.round(tasks.filter(t => t.col === 'done').length / tasks.length * 100) + '%' : '0%';
+  const total = activeTasks.length + doneTasks.length;
+  document.getElementById('s-pct').textContent = total ? Math.round(doneTasks.length / total * 100) + '%' : '0%';
 }
 function setNewPriority(p) {
   newTaskPriority = p;
@@ -1577,6 +1581,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.3 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
