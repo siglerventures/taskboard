@@ -27,11 +27,28 @@ const auth = getAuth(app);
 await signInAnonymously(auth);
 const dataRef = ref(db, 'philinity');
 window._fbRef = dataRef;
+window._fbConfigRef = ref(db, 'config/taskboard_password');
 window._fbSet = set;
 window._fbGet = get;
 window._fbRefFn = ref;
 window._fbOnValue = onValue;
 window._fbReady = true;
+
+// Clean up stale root-level data that was written there by mistake
+// Only run once — check if root /tasks exists and delete it
+get(ref(db, 'tasks')).then(snap => {
+  if (snap.exists()) {
+    console.log('Cleaning up stale root-level task data...');
+    set(ref(db, 'tasks'), null);
+    set(ref(db, 'categories'), null);
+    set(ref(db, 'completionLog'), null);
+    set(ref(db, 'taskOrder'), null);
+    set(ref(db, 'nextId'), null);
+    set(ref(db, 'nextCatId'), null);
+    set(ref(db, 'people'), null);
+    console.log('✅ Stale root data cleaned up');
+  }
+}).catch(() => {});
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
@@ -230,7 +247,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.8</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 3.9</div>
   </div>
 </div>
 <script>
@@ -260,9 +277,9 @@ async function checkPW() {
   var correctPW = '1002';
   try {
     var waited = 0;
-    while (!window._fbGet && waited < 3000) { await new Promise(r => setTimeout(r, 100)); waited += 100; }
-    if (window._fbGet && window._fbRefFn) {
-      var snap = await window._fbGet(window._fbRefFn(window._fbRef._repo.database, 'config/taskboard_password'));
+    while (!window._fbConfigRef && waited < 3000) { await new Promise(r => setTimeout(r, 100)); waited += 100; }
+    if (window._fbConfigRef && window._fbGet) {
+      var snap = await window._fbGet(window._fbConfigRef);
       if (snap.exists()) correctPW = snap.val();
     }
   } catch(e) { console.warn('Using default password', e.message); }
@@ -1522,6 +1539,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.8 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev3.9 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
