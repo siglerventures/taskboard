@@ -53,9 +53,22 @@ onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
   if (window._suppressListener) return;
-  tasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
-  categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  let loadedTasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
   completionLog = data.completionLog || [];
+  // Migrate any old col:done tasks to completionLog
+  const doneTasks = loadedTasks.filter(t => t.col === 'done');
+  if (doneTasks.length > 0) {
+    const existingKeys = new Set(completionLog.map(l => l.text + '|' + (l.completedAt||'')));
+    doneTasks.forEach(t => {
+      const key = t.text + '|' + (t.completedAt||'');
+      if (!existingKeys.has(key)) {
+        completionLog.unshift({ id: t.id, text: t.text, cat: t.cat, assignee: t.assignee, completedAt: t.completedAt || new Date().toISOString(), dateAdded: t.dateAdded, priority: t.priority || 'medium' });
+      }
+    });
+    loadedTasks = loadedTasks.filter(t => t.col !== 'done');
+  }
+  tasks = loadedTasks;
+  categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
   taskOrder = data.taskOrder || {};
   nextId = data.nextId || 100;
   nextCatId = data.nextCatId || 50;
@@ -247,7 +260,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.4</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.5</div>
   </div>
 </div>
 <script>
@@ -347,8 +360,7 @@ async function checkPW() {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
       <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">Total</div></div>
       <div class="stat"><div class="stat-num" id="s-pending" style="color:#6b7280;">0</div><div class="stat-label">Pending</div></div>
-      <div class="stat"><div class="stat-num" id="s-done" style="color:#4caf50;">0</div><div class="stat-label">Done</div></div>
-      <div class="stat"><div class="stat-num" id="s-alltime" style="color:#6366f1;">0</div><div class="stat-label">All-time</div></div>
+      <div class="stat"><div class="stat-num" id="s-done" style="color:#4caf50;">0</div><div class="stat-label">Completed</div></div>
       <div class="stat"><div class="stat-num" id="s-pct">0%</div><div class="stat-label">Progress</div></div>
     </div>
     <!-- Person Stats -->
@@ -631,14 +643,13 @@ function getCatColor(id) {
 function getBadgeStyle(id) { const c = getCatColor(id); return `background:${c.bg};color:${c.color};`; }
 function updateStats() {
   const activeTasks = tasks.filter(t => t.col !== 'done');
-  const doneTasks = tasks.filter(t => t.col === 'done');
   const pendingTasks = tasks.filter(t => t.col === 'pending');
+  const completedCount = completionLog.length;
   document.getElementById('s-total').textContent = activeTasks.length;
-  document.getElementById('s-done').textContent = doneTasks.length;
+  document.getElementById('s-done').textContent = completedCount;
   document.getElementById('s-pending').textContent = pendingTasks.length;
-  document.getElementById('s-alltime').textContent = completionLog.length;
-  const total = activeTasks.length + doneTasks.length;
-  document.getElementById('s-pct').textContent = total ? Math.round(doneTasks.length / total * 100) + '%' : '0%';
+  const total = activeTasks.length + completedCount;
+  document.getElementById('s-pct').textContent = total ? Math.round(completedCount / total * 100) + '%' : '0%';
 }
 function setNewPriority(p) {
   newTaskPriority = p;
@@ -793,8 +804,8 @@ function timeTaken(addedIso, completedIso) {
 function moveTask(tk, targetColId) {
   if (targetColId === 'done') {
     const now = new Date().toISOString();
-    if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
-    tk.completedAt = now; tk.col = 'done';
+    completionLog.unshift({ id: tk.id, text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null, priority: tk.priority || 'medium' });
+    tasks = tasks.filter(t => t.id !== tk.id);
   } else if (targetColId === 'pending') {
     tk.col = 'pending';
   } else {
@@ -886,9 +897,9 @@ function renderAll() {
         e.stopPropagation();
         const tk = tasks.find(x => x.id === task.id);
         const now = new Date().toISOString();
-        completionLog.unshift({ text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null });
-        tk.col = 'done'; tk.completedAt = now;
-        save(); renderAll(); renderDone(); updateStats(); renderHistory();
+        completionLog.unshift({ id: tk.id, text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now, dateAdded: tk.dateAdded || null, priority: tk.priority || 'medium' });
+        tasks = tasks.filter(t => t.id !== task.id);
+        save(); renderAll(); updateStats(); renderHistory();
       });
       t.querySelector('.priority-pill').addEventListener('click', e => { e.stopPropagation(); cyclePriority(task.id); });
       t.addEventListener('dblclick', e => {
@@ -932,7 +943,7 @@ function renderAll() {
           else if (tk) { moveTask(tk, col.id); reorderWithinCol(col.id, dragId, task.id, insertBefore); }
           document.querySelectorAll('.task-insert-line').forEach(el => el.remove());
           dragId = null;
-          save(); renderAll(); renderDone(); updateStats(); renderHistory();
+          save(); renderAll(); updateStats(); renderHistory();
         });
       }
       list.appendChild(t);
@@ -963,39 +974,15 @@ function renderAll() {
   });
   updateStats();
 }
-function renderDone() {
-  const doneTasks = tasks.filter(t => t.col === 'done')
-    .sort((a, b) => { const at = a.completedAt || a.dateAdded || ''; const bt = b.completedAt || b.dateAdded || ''; return bt.localeCompare(at); });
-  const el = document.getElementById('done-list');
-  if (!el) return;
-  if (doneTasks.length === 0) { el.innerHTML = '<div class="empty-state">No completed tasks yet</div>'; return; }
-  el.innerHTML = doneTasks.map(task => {
-    const taken = task.dateAdded && task.completedAt ? timeTaken(task.dateAdded, task.completedAt) : '';
-    const completedStr = task.completedAt ? `Completed ${fmtDate(task.completedAt)}` : '';
-    return `
-    <div class="done-item">
-      <button class="done-uncheck" onclick="undoneTask(${task.id})" title="Move back">
-        <svg viewBox="0 0 8 8" fill="none"><polyline points="1,4 3.5,6.5 7,2" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div style="flex:1;min-width:0;">
-        <span class="done-text">${escapeHtml(task.text)}</span>
-        <div class="task-meta" style="margin-top:3px;">
-          <span class="cat-badge" style="${getBadgeStyle(task.cat)};font-size:9px;">${escapeHtml(getCatLabel(task.cat))}</span>
-          <span class="priority-pill p-${task.priority||'medium'}" style="font-size:9px;">${task.priority||'medium'}</span>
-          ${task.assignee ? `<span style="font-size:9px;color:#64748b;">👤 ${escapeHtml(task.assignee)}</span>` : ''}
-        </div>
-        ${completedStr || taken ? `<div style="font-size:9px;color:#bbb;margin-top:2px;">${completedStr}${taken ? ` · ${taken}` : ''}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-function undoneTask(id) {
-  const tk = tasks.find(t => t.id === id);
-  if (!tk) return;
-  tk.col = tk.cat;
-  const idx = completionLog.findIndex(l => l.text === tk.text);
-  if (idx !== -1) completionLog.splice(idx, 1);
-  save(); renderAll(); renderDone(); updateStats(); renderHistory();
+function renderDone() { /* deprecated - tasks now removed from array on completion */ }
+function undoneTask(logIdx) {
+  const l = completionLog[logIdx];
+  if (!l) return;
+  // Restore task to its category
+  const restored = { id: l.id || nextId++, text: l.text, cat: l.cat, col: l.cat, priority: l.priority || 'medium', assignee: l.assignee || getDefaultAssignee(l.cat), dateAdded: l.dateAdded || new Date().toISOString() };
+  tasks.push(restored);
+  completionLog.splice(logIdx, 1);
+  save(); renderAll(); updateStats(); renderHistory();
 }
 function renderHistory() {
   if (!historyPanelOpen) return; // don't render if collapsed
@@ -1008,7 +995,16 @@ function renderHistory() {
       const d = new Date(l.completedAt);
       const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
       const realIdx = completionLog.indexOf(l);
-      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${realIdx})" title="Double-click to restore this task"><span class="log-text">${escapeHtml(l.text)}</span><div class="log-right"><span class="log-date">${ds}</span><span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${escapeHtml(getCatLabel(l.cat))}</span></div></div>`;
+      const taken = l.dateAdded && l.completedAt ? timeTaken(l.dateAdded, l.completedAt) : '';
+      return `<div class="log-item" style="cursor:pointer;" ondblclick="openRestoreModal(${realIdx})" title="Double-click to restore this task">
+        <span class="log-text">${escapeHtml(l.text)}</span>
+        <div class="log-right">
+          <span class="log-date">${ds}</span>
+          ${taken ? `<span style="font-size:9px;color:#bbb;">${taken}</span>` : ''}
+          <span class="cat-badge" style="${getBadgeStyle(l.cat)};font-size:9px;">${escapeHtml(getCatLabel(l.cat))}</span>
+          ${l.assignee ? `<span style="font-size:9px;color:#64748b;">👤 ${escapeHtml(l.assignee)}</span>` : ''}
+        </div>
+      </div>`;
     }).join('');
   }
   const ctx = document.getElementById('monthly-chart').getContext('2d');
@@ -1289,9 +1285,10 @@ function toggleCtxSubmenu(e) {
 function ctxComplete() {
   const tk = tasks.find(t => t.id === ctxTaskId);
   if (!tk) return closeCtxMenu();
-  if (tk.col !== 'done') completionLog.unshift({ text: tk.text, cat: tk.cat, completedAt: new Date().toISOString() });
-  tk.col = 'done';
-  closeCtxMenu(); save(); renderAll(); renderDone(); updateStats(); renderHistory();
+  const now2 = new Date().toISOString();
+  completionLog.unshift({ id: tk.id, text: tk.text, cat: tk.cat, assignee: tk.assignee || getDefaultAssignee(tk.cat), completedAt: now2, dateAdded: tk.dateAdded || null, priority: tk.priority || 'medium' });
+  tasks = tasks.filter(t => t.id !== ctxTaskId);
+  closeCtxMenu(); save(); renderAll(); updateStats(); renderHistory();
 }
 function ctxPending() {
   const tk = tasks.find(t => t.id === ctxTaskId);
@@ -1375,7 +1372,7 @@ function renderPersonStats() {
   const assigned = {};
   PEOPLE.forEach(p => { assigned[p] = 0; });
   tasks.forEach(tk => {
-    if (tk.col === 'done') return;
+    if (!tk.col || tk.col === 'done') return; // done tasks removed from array
     const person = tk.assignee || getDefaultAssignee(tk.cat);
     if (assigned[person] !== undefined) assigned[person]++;
     else assigned[person] = 1;
@@ -1390,7 +1387,7 @@ function renderPersonStats() {
     if (completed[person] !== undefined) completed[person]++;
     else completed[person] = 1;
   });
-  tasks.filter(t => t.col === 'done' && t.completedAt).forEach(tk => {
+  completionLog.filter(l => l.completedAt).forEach(tk => {
     const key = tk.completedAt.slice(0, 7);
     if (key !== monthKey) return;
     const person = tk.assignee || getDefaultAssignee(tk.cat);
@@ -1428,7 +1425,7 @@ function closeRestoreModal() { document.getElementById('restore-modal').classLis
 function confirmRestore() {
   const l = completionLog[restoringLogIdx];
   const catId = document.getElementById('restore-cat').value;
-  const newTask = { id: nextId++, text: l.text, cat: catId, col: catId, priority: 'medium', assignee: l.assignee || getDefaultAssignee(catId), dateAdded: new Date().toISOString() };
+  const newTask = { id: l.id || nextId++, text: l.text, cat: catId, col: catId, priority: l.priority || 'medium', assignee: l.assignee || getDefaultAssignee(catId), dateAdded: l.dateAdded || new Date().toISOString() };
   tasks.push(newTask);
   if (!taskOrder[catId]) taskOrder[catId] = [];
   taskOrder[catId].unshift(newTask.id);
@@ -1581,6 +1578,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
