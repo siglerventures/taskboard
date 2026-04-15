@@ -25,7 +25,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 await signInAnonymously(auth);
-const dataRef = ref(db, 'philinity');
+const dataRef = ref(db, 'taskboard');
 window._fbRef = dataRef;
 window._fbConfigRef = ref(db, 'config/taskboard_password');
 window._fbSet = set;
@@ -248,7 +248,7 @@ onValue(dataRef, (snapshot) => {
       <button type="submit" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     </form>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.1</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.2</div>
   </div>
 </div>
 <script>
@@ -1580,6 +1580,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.1 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.2 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
