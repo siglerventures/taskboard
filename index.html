@@ -34,21 +34,7 @@ window._fbRefFn = ref;
 window._fbOnValue = onValue;
 window._fbReady = true;
 
-// Clean up stale root-level data that was written there by mistake
-// Only run once — check if root /tasks exists and delete it
-get(ref(db, 'tasks')).then(snap => {
-  if (snap.exists()) {
-    console.log('Cleaning up stale root-level task data...');
-    set(ref(db, 'tasks'), null);
-    set(ref(db, 'categories'), null);
-    set(ref(db, 'completionLog'), null);
-    set(ref(db, 'taskOrder'), null);
-    set(ref(db, 'nextId'), null);
-    set(ref(db, 'nextCatId'), null);
-    set(ref(db, 'people'), null);
-    console.log('✅ Stale root data cleaned up');
-  }
-}).catch(() => {});
+
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) return;
@@ -260,7 +246,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.5</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.6</div>
   </div>
 </div>
 <script>
@@ -1578,6 +1564,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.6 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
