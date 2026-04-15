@@ -242,12 +242,12 @@ onValue(dataRef, (snapshot) => {
     <div style="font-size:22px;font-weight:700;color:#1a1a1a;text-align:center">Philinity's Task Board</div>
     <div style="font-size:13px;color:#888;text-align:center">Private — Enter password to continue</div>
     <form onsubmit="event.preventDefault();checkPW()" style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center;">
-      <input type="password" id="pw-input" placeholder="Password"
+      <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password"
         style="background:#f4f3ee;border:1.5px solid #ddd;color:#1a1a1a;padding:14px 18px;border-radius:10px;font-size:16px;outline:none;width:100%;text-align:center;box-sizing:border-box;-webkit-appearance:none">
       <button type="submit" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     </form>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.9</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.0</div>
   </div>
 </div>
 <script>
@@ -1579,6 +1579,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.9 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.0 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
