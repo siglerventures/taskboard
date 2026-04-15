@@ -246,7 +246,7 @@ onValue(dataRef, (snapshot) => {
       onkeydown="if(event.key==='Enter') checkPW()">
     <button onclick="checkPW()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.6</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 4.7</div>
   </div>
 </div>
 <script>
@@ -601,6 +601,20 @@ function showSyncNotice(msg) {
   el._t = setTimeout(() => el.textContent = '', 2000);
 }
 function save() {
+  // Clean undefined fields before saving to Firebase
+  completionLog.forEach(l => {
+    if (!l.assignee) l.assignee = 'Phil';
+    if (!l.dateAdded) l.dateAdded = l.completedAt || new Date().toISOString();
+    if (!l.cat) l.cat = 'personal';
+    if (!l.text) l.text = '';
+    if (!l.priority) l.priority = 'medium';
+  });
+  tasks.forEach(t => {
+    if (!t.assignee) t.assignee = getDefaultAssignee(t.cat);
+    if (!t.priority) t.priority = 'medium';
+    if (!t.cat) t.cat = 'followup';
+    if (!t.col) t.col = t.cat;
+  });
   localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
   localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
   localStorage.setItem('phil-log-v6', JSON.stringify(completionLog));
@@ -1564,6 +1578,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.6 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev4.7 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
