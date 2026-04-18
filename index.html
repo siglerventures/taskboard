@@ -63,6 +63,9 @@ onValue(dataRef, (snapshot) => {
   renderAll();
   renderHistory();
   showSyncNotice('Synced ☁️');
+}, (error) => {
+  console.error('Task Board Firebase listener failed:', error);
+  showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
 });
 </script>
 <style>
@@ -1580,6 +1583,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.2 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.3 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
