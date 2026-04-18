@@ -556,7 +556,7 @@ onAuthStateChanged(auth, (user) => {
     </div>
     <!-- Categories -->
     <div style="margin-bottom:8px;margin-top:4px;">
-      <button class="manage-cats-btn" onclick="event.stopPropagation();toggleCatPanel()">🗂 Manage Categories ▾</button>
+      <button class="manage-cats-btn" onclick="event.stopPropagation();toggleCatPanel()" id="cat-panel-btn">🗂 Manage Categories ▾</button>
     </div>
     <div class="cat-panel" id="cat-panel">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
@@ -956,7 +956,7 @@ function toggleHistoryPanel() {
 function toggleCatPanel() {
   catPanelOpen = !catPanelOpen;
   document.getElementById('cat-panel').classList.toggle('open', catPanelOpen);
-  document.querySelector('.manage-cats-btn').textContent = catPanelOpen ? '🗂 Manage Categories ▴' : '🗂 Manage Categories ▾';
+  document.getElementById('cat-panel-btn').textContent = catPanelOpen ? '🗂 Manage Categories ▴' : '🗂 Manage Categories ▾';
   if (catPanelOpen) renderCatList();
 }
 function renderCatList() {
