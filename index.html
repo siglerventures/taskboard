@@ -12,6 +12,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
   authDomain: "philinity-893d2.firebaseapp.com",
@@ -21,82 +22,103 @@ const firebaseConfig = {
   messagingSenderId: "443020781676",
   appId: "1:443020781676:web:614ec91c9ba33076eb9049"
 };
+
+const ALLOWED_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
+
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
 
-// Sign in with Google if not already signed in
-if (!auth.currentUser) {
+// Expose sign-in function to the non-module script
+window.googleSignIn = async function() {
   try {
-    await signInWithPopup(auth, provider);
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    if (!ALLOWED_UIDS.includes(result.user.uid)) {
+      await signOut(auth);
+      document.getElementById('pw-error').style.display = 'block';
+      document.getElementById('pw-error').textContent = 'This Google account is not authorized.';
+      return;
+    }
+    // Success — auth-gate will be hidden by onAuthStateChanged below
   } catch(e) {
-    console.error('Google sign-in failed:', e);
+    console.error('Sign-in failed:', e);
+    document.getElementById('pw-error').style.display = 'block';
+    document.getElementById('pw-error').textContent = 'Sign-in failed. Please try again.';
   }
-}
+};
+
+window.doSignOut = async function() {
+  await signOut(auth);
+  location.reload();
+};
+
 const dataRef = ref(db, 'taskboard');
 window._fbRef = dataRef;
-// config/taskboard_password no longer used — Google Sign-In handles auth
 window._fbSet = set;
 window._fbGet = get;
 window._fbRefFn = ref;
 window._fbOnValue = onValue;
 window._fbReady = true;
 
-
 window._firebaseDataLoaded = false;
 
-// Wrap onValue in onAuthStateChanged to guarantee auth token is ready on mobile
+// onAuthStateChanged fires whenever sign-in state changes
 onAuthStateChanged(auth, (user) => {
-  if (!user) return;
-  // UID whitelist check
-  if (!['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'].includes(user.uid)) {
+  if (!user) {
+    // Not signed in — show gate
+    document.getElementById('auth-gate').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    return;
+  }
+  // Signed in — verify UID
+  if (!ALLOWED_UIDS.includes(user.uid)) {
     signOut(auth);
     return;
   }
-  // Hide auth gate
+  // Authorized — hide gate, load data
   document.getElementById('auth-gate').style.display = 'none';
   document.body.style.overflow = '';
+  
   onValue(dataRef, (snapshot) => {
-  const data = snapshot.val();
-  if (!data) {
-    if (window._firebaseDataLoaded) return;
+    const data = snapshot.val();
+    if (!data) {
+      if (window._firebaseDataLoaded) return;
+      window._firebaseDataLoaded = true;
+      tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+      categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+      completionLog = [];
+      taskOrder = {};
+      nextId = 100;
+      nextCatId = 50;
+      rebuildCatSelects(); renderAll(); renderHistory();
+      return;
+    }
+    if (window._suppressListener) return;
     window._firebaseDataLoaded = true;
-    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
-    categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-    completionLog = [];
-    taskOrder = {};
-    nextId = 100;
-    nextCatId = 50;
-    rebuildCatSelects(); renderAll(); renderHistory();
-    return;
-  }
-  if (window._suppressListener) return;
-  window._firebaseDataLoaded = true;
-  let loadedTasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
-  completionLog = data.completionLog || [];
-  // Migrate any old col:done tasks to completionLog
-  const doneTasks = loadedTasks.filter(t => t.col === 'done');
-  if (doneTasks.length > 0) {
-    const existingKeys = new Set(completionLog.map(l => l.text + '|' + (l.completedAt||'')));
-    doneTasks.forEach(t => {
-      const key = t.text + '|' + (t.completedAt||'');
-      if (!existingKeys.has(key)) {
-        completionLog.unshift({ id: t.id, text: t.text, cat: t.cat, assignee: t.assignee, completedAt: t.completedAt || new Date().toISOString(), dateAdded: t.dateAdded, priority: t.priority || 'medium' });
-      }
-    });
-    loadedTasks = loadedTasks.filter(t => t.col !== 'done');
-  }
-  tasks = loadedTasks;
-  categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-  taskOrder = data.taskOrder || {};
-  nextId = data.nextId || 100;
-  nextCatId = data.nextCatId || 50;
-  if (data.people) PEOPLE = data.people;
-  rebuildCatSelects();
-  renderAll();
-  renderHistory();
-  showSyncNotice('Synced ☁️');
+    let loadedTasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
+    completionLog = data.completionLog || [];
+    const doneTasks = loadedTasks.filter(t => t.col === 'done');
+    if (doneTasks.length > 0) {
+      const existingKeys = new Set(completionLog.map(l => l.text + '|' + (l.completedAt||'')));
+      doneTasks.forEach(t => {
+        const key = t.text + '|' + (t.completedAt||'');
+        if (!existingKeys.has(key)) {
+          completionLog.unshift({ id: t.id, text: t.text, cat: t.cat, assignee: t.assignee, completedAt: t.completedAt || new Date().toISOString(), dateAdded: t.dateAdded, priority: t.priority || 'medium' });
+        }
+      });
+      loadedTasks = loadedTasks.filter(t => t.col !== 'done');
+    }
+    tasks = loadedTasks;
+    categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    taskOrder = data.taskOrder || {};
+    nextId = data.nextId || 100;
+    nextCatId = data.nextCatId || 50;
+    if (data.people) PEOPLE = data.people;
+    rebuildCatSelects();
+    renderAll();
+    renderHistory();
+    showSyncNotice('Synced ☁️');
   }, (error) => {
     console.error('Task Board Firebase listener failed:', error);
     if (!window._firebaseDataLoaded) {
@@ -292,40 +314,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.5</div>
   </div>
 </div>
-<script>
-// Show auth gate — Google Sign-In will hide it
-(function() {
-  document.getElementById('auth-gate').style.display = 'flex';
-  document.body.style.overflow = 'hidden';
-})();
 
-async const ALLOWED_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
-
-async function googleSignIn() {
-  try {
-    const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    const uid = result.user.uid;
-    if (!ALLOWED_UIDS.includes(uid)) {
-      await signOut(auth);
-      document.getElementById('pw-error').style.display = 'block';
-      document.getElementById('pw-error').textContent = 'This Google account is not authorized.';
-      return;
-    }
-    document.getElementById('auth-gate').style.display = 'none';
-    document.body.style.overflow = '';
-  } catch(e) {
-    console.error('Sign-in failed:', e);
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-error').textContent = 'Sign-in failed. Please try again.';
-  }
-}
-
-async function doSignOut() {
-  await signOut(auth);
-  location.reload();
-}
-</script>
 
 <!-- TOP BAR -->
 <div class="top-bar">
