@@ -462,7 +462,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 6.1</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 6.2</div>
   </div>
 </div>
 
@@ -2287,6 +2287,107 @@ function goHome() {
   }, { passive: false });
 })();
 
+// ── SMART BACK BUTTON STACK ──────────────────────────────
+// Intercepts the phone back button so it dismisses UI layers
+// instead of exiting the app on the first press.
+// Strategy: push a synthetic history state on load. When user hits back,
+// popstate fires — we dismiss the topmost layer and push a fresh state
+// so the next back press is also captured. Only when nothing is dismissable
+// do we allow a double-back to actually exit.
+(function installBackStack() {
+  let exitWarned = false;
+  let exitWarnTimer = null;
+
+  // Show a toast-style hint
+  function showBackToast(msg) {
+    let toast = document.getElementById('back-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'back-toast';
+      toast.style.cssText = 'position:fixed;bottom:60px;left:50%;transform:translateX(-50%);background:rgba(26,26,26,0.92);color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:9998;box-shadow:0 4px 16px rgba(0,0,0,0.25);pointer-events:none;transition:opacity 0.2s;opacity:0;';
+      document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.opacity = '1';
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { toast.style.opacity = '0'; }, 1800);
+  }
+
+  // Try to dismiss the topmost active layer. Returns true if something was dismissed.
+  function dismissTopLayer() {
+    // 1. Context menus (task right-click / column right-click)
+    const ctxMenu = document.getElementById('ctx-menu');
+    if (ctxMenu && ctxMenu.classList.contains('open')) { closeCtxMenu(); return true; }
+    const colCtxMenu = document.getElementById('col-ctx-menu');
+    if (colCtxMenu && colCtxMenu.style.display === 'block') { closeColCtxMenu(); return true; }
+
+    // 2. Modals (ordered by visual stack — topmost first)
+    const dataModal = document.getElementById('tb-data-modal');
+    if (dataModal && dataModal.style.display === 'flex') { closeDataModal(); return true; }
+    const restoreModal = document.getElementById('restore-modal');
+    if (restoreModal && restoreModal.classList.contains('open')) { closeRestoreModal(); return true; }
+    const catModal = document.getElementById('cat-modal');
+    if (catModal && catModal.classList.contains('open')) { closeCatModal(); return true; }
+    const editModal = document.getElementById('modal');
+    if (editModal && editModal.classList.contains('open')) { closeModal(); return true; }
+
+    // 3. AI chat thread
+    if (typeof aiThreadOpen !== 'undefined' && aiThreadOpen) { closeAIThread(); return true; }
+
+    // 4. Active search text
+    const searchInput = document.getElementById('task-search-input');
+    if (searchInput && searchInput.value) {
+      searchInput.value = '';
+      if (typeof applyTaskSearch === 'function') applyTaskSearch();
+      return true;
+    }
+
+    // 5. Expanded bottom panels
+    if (typeof aiHistoryOpen !== 'undefined' && aiHistoryOpen) { toggleAIHistoryPanel(); return true; }
+    if (typeof historyPanelOpen !== 'undefined' && historyPanelOpen) { toggleHistoryPanel(); return true; }
+    const boardPanel = document.getElementById('board-panel');
+    if (boardPanel && boardPanel.style.display === 'block') { toggleBoardPanel(); return true; }
+
+    // 6. Mobile: if not on default category tab, bounce back to default
+    const isMobile = window.innerWidth <= 600;
+    if (isMobile && typeof userMobileDefault !== 'undefined' && userMobileDefault && activeMobileCol !== userMobileDefault) {
+      activeMobileCol = userMobileDefault;
+      if (typeof renderAll === 'function') renderAll();
+      if (typeof saveUserMobileLast === 'function') saveUserMobileLast(activeMobileCol);
+      return true;
+    }
+
+    return false;
+  }
+
+  // Seed the history so popstate can fire without leaving the page
+  function seedHistory() {
+    try { history.pushState({ tb: 1 }, ''); } catch(_) {}
+  }
+  seedHistory();
+
+  window.addEventListener('popstate', (e) => {
+    // Something asked to go back — see if we have UI to dismiss
+    const dismissed = dismissTopLayer();
+
+    if (dismissed) {
+      // Re-seed so we can catch the next back press too
+      seedHistory();
+      return;
+    }
+
+    // Nothing to dismiss — either warn + re-seed, or actually let the exit happen
+    if (!exitWarned) {
+      exitWarned = true;
+      showBackToast('Tap back again to exit');
+      seedHistory(); // eat this back press
+      clearTimeout(exitWarnTimer);
+      exitWarnTimer = setTimeout(() => { exitWarned = false; }, 2500);
+    }
+    // If already warned and no layer to dismiss, we DON'T re-seed → the next
+    // popstate (which is really this browser nav) completes and user exits.
+  });
+})();
 </script>
 
 <!-- DATA MODAL -->
@@ -2325,6 +2426,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev6.1 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev6.2 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
