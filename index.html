@@ -367,7 +367,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.11</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.12</div>
   </div>
 </div>
 
@@ -399,7 +399,7 @@ onAuthStateChanged(auth, (user) => {
 <!-- AI TASK BAR -->
 <div class="ai-task-bar" id="ai-task-bar">
   <span class="ai-icon">🤖</span>
-  <input type="text" id="ai-task-input" placeholder="Ask AI — 'Add clean windows for Austen as high priority'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" enterkeyhint="send" />
+  <input type="text" id="ai-task-input" placeholder="Ask AI — add a task OR ask 'how many windows cleaned by who?'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" enterkeyhint="send" />
   <button class="ai-ask-btn" id="ai-ask-btn" onclick="askAI()">Ask</button>
   <div id="ai-task-response" class="ai-task-response" style="display:none;"></div>
 </div>
@@ -1732,45 +1732,60 @@ async function askAI() {
   // Build context for the AI
   const catNames = categories.map(c => c.id).join(', ');
   const peopleList = PEOPLE.join(', ');
-  const taskSummary = tasks.slice(0, 30).map(t =>
+  const taskSummary = tasks.map(t =>
     `ID:${t.id} "${t.text}" cat:${t.cat} assignee:${t.assignee} priority:${t.priority} col:${t.col}`
   ).join('\n');
 
-  const systemPrompt = `You are a task board assistant for Philinity Task Board. You help manage tasks by interpreting natural language commands.
+  // Include completion history so the AI can answer questions about past work
+  const historySummary = completionLog.slice(0, 150).map(l => {
+    const date = l.completedAt ? l.completedAt.slice(0, 10) : 'unknown';
+    return `"${l.text}" cat:${l.cat} assignee:${l.assignee || 'Phil'} completed:${date}`;
+  }).join('\n');
+
+  const systemPrompt = `You are a task board assistant for Philinity Task Board. You help manage tasks AND answer questions about current work and completion history.
 
 Available categories (use exact id): ${catNames}
 Available people (use exact name): ${peopleList}
 Valid priorities: high, medium, low
-Valid columns (same as category ids, tasks live in their category column)
+Total active tasks: ${tasks.length}
+Total completed tasks in history: ${completionLog.length}
 
-Current tasks (first 30):
+ACTIVE TASKS (all ${tasks.length}):
 ${taskSummary}
+
+COMPLETION HISTORY (most recent ${Math.min(150, completionLog.length)}):
+${historySummary}
 
 You must respond ONLY with valid JSON — no markdown, no explanation:
 
 For ADDING a task:
 {"action":"add","text":"Task text","cat":"category_id","assignee":"Person","priority":"high|medium|low"}
 
-For UPDATING a task (change text, priority, assignee, or category):
+For UPDATING a task:
 {"action":"update","id":<task_id>,"changes":{"text":"new text","priority":"high","assignee":"Person","cat":"category_id"}}
 
-For COMPLETING/MOVING a task to done:
+For COMPLETING a task:
 {"action":"complete","id":<task_id>}
 
 For DELETING a task:
 {"action":"delete","id":<task_id>}
 
-For multiple operations, return an array: [{"action":...}, {"action":...}]
+For ANSWERING a QUESTION about tasks/history (counts, who-did-what, what's-pending, summaries, analytics):
+{"action":"answer","message":"Your plain-language answer here. Be specific and cite task text + assignees + dates."}
 
-If you cannot determine the action or category, return:
+For multiple operations, return an array.
+
+If you cannot determine the action or category:
 {"action":"error","message":"Brief explanation of what you need"}
 
 Rules:
-- Match person names case-insensitively (Phil, Trinity, Austen)
-- Match category names fuzzy (e.g. "autoflag" matches autoflag category)
-- Default assignee if not specified: Phil
-- Default priority if not specified: medium
-- Default category if not specified: first available category`;
+- Questions like "how many times did we...", "when did I last...", "who did...", "what's pending for..." are ANSWER actions, not manage actions
+- When answering, look at BOTH active tasks AND completion history
+- Count matches inclusively — "cleaned windows" matches "clean windows", "window cleaning", etc.
+- Always cite specific names and dates when available
+- Match person names case-insensitively
+- Match category names fuzzy
+- Default assignee: Phil, default priority: medium, default category: first available`;
 
   try {
     const user = window._fbAuth?.currentUser;
@@ -1848,21 +1863,25 @@ Rules:
           results.push(`⚠️ Task #${action.id} not found`);
         }
 
+      } else if (action.action === 'answer') {
+        results.push(action.message || 'No answer provided.');
+
       } else if (action.action === 'error') {
         results.push(`❓ ${action.message}`);
       }
     }
 
-    save();
-    renderAll();
-    updateStats();
+    // Determine whether this was a read-only Q&A (answer action) or a data mutation
+    const wasReadOnly = actions.every(a => a.action === 'answer' || a.action === 'error');
+    if (!wasReadOnly) { save(); renderAll(); updateStats(); }
 
     responseDiv.className = 'ai-task-response success';
     responseDiv.textContent = results.join(' · ');
     input.value = '';
 
-    // Auto-hide after 4 seconds
-    setTimeout(() => { responseDiv.style.display = 'none'; }, 4000);
+    // Answers linger so you can read them; mutations auto-hide quickly
+    const hideMs = wasReadOnly ? 20000 : 4000;
+    setTimeout(() => { responseDiv.style.display = 'none'; }, hideMs);
 
   } catch(e) {
     responseDiv.className = 'ai-task-response error';
@@ -1953,6 +1972,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.11 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.12 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
