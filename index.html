@@ -59,6 +59,7 @@ window._fbSet = set;
 window._fbGet = get;
 window._fbRefFn = ref;
 window._fbOnValue = onValue;
+window._fbDb = db;
 window._fbReady = true;
 window._fbAuth = auth;
 
@@ -80,6 +81,9 @@ onAuthStateChanged(auth, (user) => {
   // Authorized — hide gate, load data
   document.getElementById('auth-gate').style.display = 'none';
   document.body.style.overflow = '';
+
+  // Load this user's mobile category preferences
+  if (typeof loadUserMobilePrefs === 'function') loadUserMobilePrefs();
   
   onValue(dataRef, (snapshot) => {
     const data = snapshot.val();
@@ -360,7 +364,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.8</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.9</div>
   </div>
 </div>
 
@@ -641,6 +645,42 @@ let nextId = 100, nextCatId = 50;
 let dragId = null, dragColId = null, editingId = null, editingCatId = null, chartInstance = null;
 let activeMobileCol = null;
 let historyPanelOpen = false;
+
+// ── PER-USER MOBILE PREFS (stored at users/<uid>/mobilePrefs) ──
+let userMobileDefault = null;     // default category for this user
+let userMobileLast = null;         // last category viewed on mobile (for persistence)
+let userPrefsLoaded = false;       // don't overwrite until loaded from Firebase
+// Hardcoded per-UID defaults (fallback if nothing in Firebase yet)
+const USER_DEFAULTS = {
+  'CuJigrzCbRfFFsM7uqe0mix46xH3': 'personal',  // Phil → Personal
+  'g4stabGPKiWAE23NTw6oUsqawWf1': 'trinity',   // Trinity → Trinity
+};
+async function loadUserMobilePrefs() {
+  const user = window._fbAuth?.currentUser;
+  if (!user || !window._fbGet || !window._fbRefFn || !window._fbDb) return;
+  try {
+    const prefsRef = window._fbRefFn(window._fbDb, 'users/' + user.uid + '/mobilePrefs');
+    const snap = await window._fbGet(prefsRef);
+    const data = snap.exists() ? snap.val() : {};
+    userMobileDefault = data.defaultCategory || USER_DEFAULTS[user.uid] || 'personal';
+    userMobileLast = data.lastCategory || userMobileDefault;
+    userPrefsLoaded = true;
+    // Apply to current session if mobile and not already set by user action
+    if (window.innerWidth <= 600 && !activeMobileCol) {
+      activeMobileCol = userMobileLast;
+      if (typeof renderAll === 'function') renderAll();
+    }
+  } catch(e) { console.warn('Mobile prefs load failed:', e); }
+}
+async function saveUserMobileLast(catId) {
+  const user = window._fbAuth?.currentUser;
+  if (!user || !userPrefsLoaded || !window._fbSet || !window._fbRefFn || !window._fbDb) return;
+  try {
+    const prefsRef = window._fbRefFn(window._fbDb, 'users/' + user.uid + '/mobilePrefs');
+    await window._fbSet(prefsRef, { defaultCategory: userMobileDefault, lastCategory: catId });
+    userMobileLast = catId;
+  } catch(e) { console.warn('Mobile prefs save failed:', e); }
+}
 window.addEventListener('resize', () => { if (typeof renderAll === 'function') renderAll(); });
 let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
@@ -901,10 +941,14 @@ function renderAll() {
   wrap.innerHTML = '';
   const boardCols = [...categories.filter(c => !c.archived), { id: 'pending', label: 'Pending', icon: '⏳' }];
   const isMobile = window.innerWidth <= 600;
-  // Ensure activeMobileCol is valid
+  // Ensure activeMobileCol is valid (check user prefs first, then fallbacks)
   if (!activeMobileCol || !boardCols.find(c => c.id === activeMobileCol)) {
-    // Default to Personal tab, fallback to first available
-    activeMobileCol = boardCols.find(c => c.id === 'personal')?.id || boardCols[0]?.id || null;
+    // Priority: user's last mobile category → user's default → 'personal' → first available
+    const candidates = [userMobileLast, userMobileDefault, 'personal'];
+    for (const cand of candidates) {
+      if (cand && boardCols.find(c => c.id === cand)) { activeMobileCol = cand; break; }
+    }
+    if (!activeMobileCol) activeMobileCol = boardCols[0]?.id || null;
   }
   // Render mobile tab bar
   if (isMobile) {
@@ -912,12 +956,26 @@ function renderAll() {
     tabBar.innerHTML = '';
     boardCols.forEach(col => {
       const btn = document.createElement('button');
+      btn.type = 'button';
       btn.className = 'mobile-tab' + (col.id === activeMobileCol ? ' active' : '');
+      btn.dataset.colId = col.id;
       const count = tasks.filter(t => t.col === col.id).length;
       btn.innerHTML = col.icon + ' ' + col.label + (count ? ' <span style="opacity:0.6;font-size:11px">(' + count + ')</span>' : '');
-      btn.onclick = () => { activeMobileCol = col.id; renderAll(); };
       tabBar.appendChild(btn);
     });
+    // Event delegation on the tab bar itself — survives re-renders and works reliably on touch
+    if (!tabBar._delegated) {
+      tabBar.addEventListener('click', (e) => {
+        const btn = e.target.closest('.mobile-tab');
+        if (!btn) return;
+        const catId = btn.dataset.colId;
+        if (!catId || catId === activeMobileCol) return;
+        activeMobileCol = catId;
+        saveUserMobileLast(catId);
+        renderAll();
+      });
+      tabBar._delegated = true;
+    }
   }
   boardCols.forEach(col => {
     const colTasks = sortTasks(tasks.filter(t => t.col === col.id), col.id);
@@ -1825,6 +1883,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.8 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.9 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
