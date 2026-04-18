@@ -84,6 +84,8 @@ onAuthStateChanged(auth, (user) => {
 
   // Load this user's mobile category preferences
   if (typeof loadUserMobilePrefs === 'function') loadUserMobilePrefs();
+  // Load shared AI chat history
+  if (typeof loadAIHistory === 'function') loadAIHistory();
   
   onValue(dataRef, (snapshot) => {
     const data = snapshot.val();
@@ -391,6 +393,63 @@ onAuthStateChanged(auth, (user) => {
 .ai-msg.assistant.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 .ai-msg.assistant.thinking { background: #f5f3ff; border-color: #e2d9f3; color: #6d28d9; font-style: italic; }
 .ai-msg-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6; margin-bottom: 2px; }
+
+/* AI CHAT HISTORY ENTRIES */
+.ai-hist-entry {
+  padding: 10px 12px;
+  border-bottom: 0.5px solid #f0ede6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+}
+.ai-hist-entry:last-child { border-bottom: none; }
+.ai-hist-entry:hover { background: #fafaf8; }
+.ai-hist-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  color: #888;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  flex-wrap: wrap;
+}
+.ai-hist-who {
+  font-weight: 600;
+  color: #6d28d9;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #f5f3ff;
+  font-size: 10px;
+}
+.ai-hist-kind {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ai-hist-kind.mutation { background: #f0fdf4; color: #166534; }
+.ai-hist-kind.answer { background: #eff6ff; color: #1e40af; }
+.ai-hist-kind.error { background: #fef2f2; color: #991b1b; }
+.ai-hist-q { font-size: 13px; color: #1a1a1a; line-height: 1.4; }
+.ai-hist-a { font-size: 12px; color: #555; line-height: 1.5; padding-left: 14px; border-left: 2px solid #e2d9f3; margin-top: 2px; white-space: pre-wrap; }
+.ai-hist-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  border: none;
+  background: none;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ai-hist-entry:hover .ai-hist-del { opacity: 1; }
+.ai-hist-del:hover { color: #e53e3e; }
 </style>
 </head>
 <body>
@@ -403,7 +462,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.13</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.14</div>
   </div>
 </div>
 
@@ -534,6 +593,34 @@ onAuthStateChanged(auth, (user) => {
     <h3>Monthly completions (last 12 months)</h3>
     <div class="chart-wrap"><div class="chart-inner"><canvas id="monthly-chart"></canvas></div></div>
   </div>
+</div>
+
+<!-- AI CHAT HISTORY (collapsible, matches Completion History style) -->
+<div class="bottom-section-title" onclick="toggleAIHistoryPanel()" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;user-select:none;margin-top:1rem;" title="Click to expand/collapse">
+  🤖 AI Chat History
+  <span id="ai-history-arrow" style="font-size:12px;color:#888;">▾</span>
+  <div id="ai-history-controls" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">
+    <span style="position:relative;display:flex;align-items:center;">
+      <span style="position:absolute;left:8px;color:#bbb;font-size:11px;pointer-events:none;">🔍</span>
+      <input type="text" id="ai-history-search" placeholder="Search AI history..." oninput="renderAIHistory()" onkeydown="if(event.key==='Enter')renderAIHistory()" enterkeyhint="search" style="padding:5px 10px 5px 28px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;width:180px;">
+    </span>
+    <select id="ai-history-filter" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
+      <option value="all">All turns</option>
+      <option value="mutations">Only mutations</option>
+      <option value="questions">Only questions</option>
+      <option value="errors">Only errors</option>
+    </select>
+    <select id="ai-history-user" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
+      <option value="all">All people</option>
+      <option value="CuJigrzCbRfFFsM7uqe0mix46xH3">Phil</option>
+      <option value="g4stabGPKiWAE23NTw6oUsqawWf1">Trinity</option>
+    </select>
+    <button onclick="clearAIHistoryAll()" title="Delete all AI history" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fca5a5;background:#fef2f2;color:#991b1b;font-size:12px;cursor:pointer;">🗑 Clear All</button>
+  </div>
+</div>
+<div id="ai-history-panel" style="display:none;margin-top:10px;">
+  <div id="ai-history-stats" style="font-size:11px;color:#888;margin-bottom:8px;"></div>
+  <div id="ai-history-list" class="log-list" style="max-height:420px;"></div>
 </div>
 <!-- Restore Modal -->
 <div class="modal-overlay" id="restore-modal">
@@ -1972,22 +2059,185 @@ Rules:
     if (thinkingDiv && thinkingDiv.parentNode) thinkingDiv.parentNode.removeChild(thinkingDiv);
 
     // Show AI reply in thread
-    appendAIMessage('assistant', results.join('\n'), kind);
+    const answerText = results.join('\n');
+    appendAIMessage('assistant', answerText, kind);
 
     // Persist board changes if any
     if (kind === 'mutation') { save(); renderAll(); updateStats(); }
 
+    // Log this turn to shared AI history (who asked, what, result, kind)
+    const userUid = user.uid;
+    const userName = USER_NAME_MAP[userUid] || user.displayName || 'Unknown';
+    const histKind = kind === 'mutation' ? 'mutation'
+                   : (actions.some(a => a.action === 'error') ? 'error' : 'answer');
+    appendAIHistory({
+      timestamp: new Date().toISOString(),
+      userUid: userUid,
+      userName: userName,
+      question: q,
+      answer: answerText,
+      kind: histKind
+    });
+
   } catch(e) {
     if (thinkingDiv && thinkingDiv.parentNode) thinkingDiv.parentNode.removeChild(thinkingDiv);
-    appendAIMessage('assistant', '❌ ' + (e.message || 'Something went wrong'), 'error');
+    const errMsg = '❌ ' + (e.message || 'Something went wrong');
+    appendAIMessage('assistant', errMsg, 'error');
     // Roll back the user turn in the API conversation so retries don't loop on the bad state
     aiConversation.pop();
+    // Log error turn too
+    try {
+      const curUser = window._fbAuth?.currentUser;
+      if (curUser) {
+        appendAIHistory({
+          timestamp: new Date().toISOString(),
+          userUid: curUser.uid,
+          userName: USER_NAME_MAP[curUser.uid] || curUser.displayName || 'Unknown',
+          question: q,
+          answer: errMsg,
+          kind: 'error'
+        });
+      }
+    } catch(_) {}
   }
 
   btn.disabled = false;
   input.focus();
 }
 
+
+// ── AI CHAT HISTORY ────────────────────────────────────────
+// Shared log at taskboard/aiHistory with per-turn user attribution
+let aiHistory = [];              // array of entries in memory
+let aiHistoryOpen = false;
+let aiHistoryListenerSet = false;
+const USER_NAME_MAP = {
+  'CuJigrzCbRfFFsM7uqe0mix46xH3': 'Phil',
+  'g4stabGPKiWAE23NTw6oUsqawWf1': 'Trinity',
+};
+
+function loadAIHistory() {
+  if (!window._fbDb || !window._fbRefFn || !window._fbOnValue) return;
+  if (aiHistoryListenerSet) return;
+  try {
+    const histRef = window._fbRefFn(window._fbDb, 'taskboard/aiHistory');
+    window._fbOnValue(histRef, (snap) => {
+      const data = snap.exists() ? snap.val() : [];
+      // Firebase returns object if keys look numeric, normalize to array
+      aiHistory = Array.isArray(data) ? data : Object.values(data || {});
+      if (aiHistoryOpen) renderAIHistory();
+    });
+    aiHistoryListenerSet = true;
+  } catch(e) { console.warn('AI history load failed:', e); }
+}
+
+async function appendAIHistory(entry) {
+  if (!window._fbDb || !window._fbRefFn || !window._fbSet) return;
+  try {
+    aiHistory.push(entry);
+    const histRef = window._fbRefFn(window._fbDb, 'taskboard/aiHistory');
+    await window._fbSet(histRef, aiHistory);
+  } catch(e) { console.warn('AI history save failed:', e); }
+}
+
+function toggleAIHistoryPanel() {
+  aiHistoryOpen = !aiHistoryOpen;
+  const panel = document.getElementById('ai-history-panel');
+  const arrow = document.getElementById('ai-history-arrow');
+  const controls = document.getElementById('ai-history-controls');
+  if (panel) panel.style.display = aiHistoryOpen ? 'block' : 'none';
+  if (arrow) arrow.textContent = aiHistoryOpen ? '▴' : '▾';
+  if (controls) controls.style.display = aiHistoryOpen ? 'flex' : 'none';
+  if (aiHistoryOpen) renderAIHistory();
+}
+
+function renderAIHistory() {
+  const list = document.getElementById('ai-history-list');
+  const stats = document.getElementById('ai-history-stats');
+  if (!list) return;
+
+  const q = (document.getElementById('ai-history-search')?.value || '').toLowerCase().trim();
+  const kindFilter = document.getElementById('ai-history-filter')?.value || 'all';
+  const userFilter = document.getElementById('ai-history-user')?.value || 'all';
+
+  // Newest first
+  let entries = [...aiHistory].reverse();
+  const totalCount = entries.length;
+
+  // Apply filters
+  entries = entries.filter(e => {
+    if (kindFilter === 'mutations' && e.kind !== 'mutation') return false;
+    if (kindFilter === 'questions' && e.kind !== 'answer') return false;
+    if (kindFilter === 'errors' && e.kind !== 'error') return false;
+    if (userFilter !== 'all' && e.userUid !== userFilter) return false;
+    if (q) {
+      const hay = ((e.question || '') + ' ' + (e.answer || '')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (stats) {
+    stats.textContent = entries.length === totalCount
+      ? `${totalCount} entries`
+      : `${entries.length} of ${totalCount} entries`;
+  }
+
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="empty-state" style="padding:1.5rem 0;">No AI history yet — ask the 🤖 bar a question to start.</div>';
+    return;
+  }
+
+  list.innerHTML = entries.map((e, displayIdx) => {
+    // Look up the real index in aiHistory (reversed display) for delete
+    const realIdx = aiHistory.length - 1 - displayIdx;
+    const when = e.timestamp ? new Date(e.timestamp) : null;
+    const dateStr = when
+      ? when.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }) +
+        ' ' + when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : '';
+    const who = e.userName || 'Unknown';
+    const kindLabel = e.kind === 'mutation' ? '✏ Mutation'
+                    : e.kind === 'error' ? '⚠ Error'
+                    : '💬 Q&A';
+    const kindClass = e.kind === 'mutation' ? 'mutation'
+                    : e.kind === 'error' ? 'error'
+                    : 'answer';
+    return `<div class="ai-hist-entry">
+      <button class="ai-hist-del" onclick="deleteAIHistoryEntry(${realIdx})" title="Delete this entry">✕</button>
+      <div class="ai-hist-meta">
+        <span class="ai-hist-who">👤 ${escapeHtml(who)}</span>
+        <span class="ai-hist-kind ${kindClass}">${kindLabel}</span>
+        <span>${dateStr}</span>
+      </div>
+      <div class="ai-hist-q">${escapeHtml(e.question || '')}</div>
+      ${e.answer ? `<div class="ai-hist-a">${escapeHtml(e.answer)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function deleteAIHistoryEntry(idx) {
+  if (idx < 0 || idx >= aiHistory.length) return;
+  if (!confirm('Delete this AI history entry?')) return;
+  aiHistory.splice(idx, 1);
+  try {
+    const histRef = window._fbRefFn(window._fbDb, 'taskboard/aiHistory');
+    await window._fbSet(histRef, aiHistory);
+    renderAIHistory();
+  } catch(e) { alert('Delete failed: ' + e.message); }
+}
+
+async function clearAIHistoryAll() {
+  if (!confirm(`Clear ALL ${aiHistory.length} AI history entries?\n\nThis cannot be undone.`)) return;
+  if (!confirm('Are you absolutely sure? This deletes the entire shared AI chat history for everyone.')) return;
+  aiHistory = [];
+  try {
+    const histRef = window._fbRefFn(window._fbDb, 'taskboard/aiHistory');
+    await window._fbSet(histRef, []);
+    renderAIHistory();
+    showSyncNotice('AI history cleared ✓');
+  } catch(e) { alert('Clear failed: ' + e.message); }
+}
 
 function goHome() {
   // Clear search
@@ -2068,6 +2318,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.13 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.14 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
