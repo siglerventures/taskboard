@@ -462,7 +462,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.14</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 6.1</div>
   </div>
 </div>
 
@@ -1038,6 +1038,13 @@ function fmtDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
+function daysOpenBadge(iso) {
+  if (!iso) return '';
+  const days = Math.floor((Date.now() - new Date(iso)) / 86400000);
+  if (isNaN(days) || days < 0) return '';
+  const color = days <= 7 ? '#bbb' : days <= 30 ? '#f59e0b' : '#ef4444';
+  return ` <span style="color:${color};font-weight:600;">· ${days}d</span>`;
+}
 function timeTaken(addedIso, completedIso) {
   if (!addedIso || !completedIso) return '';
   const ms = new Date(completedIso) - new Date(addedIso);
@@ -1159,7 +1166,7 @@ function renderAll() {
             <span class="assignee-badge">👤 ${escapeHtml(task.assignee || getDefaultAssignee(task.cat))}</span>
             ${task.notes ? `<span style="font-size:10px;color:#94a3b8;" title="${escapeHtml(task.notes)}">📝</span>` : ''}
           </div>
-          ${task.dateAdded ? `<div class="task-date">Added ${fmtDate(task.dateAdded)}</div>` : ''}
+          ${task.dateAdded ? `<div class="task-date">${fmtDate(task.dateAdded)}${daysOpenBadge(task.dateAdded)}</div>` : ''}
         </div>`;
       t.querySelector('.check').addEventListener('click', e => {
         e.stopPropagation();
@@ -2318,6 +2325,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.14 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev6.1 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
