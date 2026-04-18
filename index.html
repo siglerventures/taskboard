@@ -60,6 +60,7 @@ window._fbGet = get;
 window._fbRefFn = ref;
 window._fbOnValue = onValue;
 window._fbReady = true;
+window._fbAuth = auth;
 
 window._firebaseDataLoaded = false;
 
@@ -1671,7 +1672,7 @@ Rules:
 - Default category if not specified: first available category`;
 
   try {
-    const user = firebase.auth().currentUser;
+    const user = window._fbAuth?.currentUser;
     if (!user) throw new Error('Not signed in');
     const idToken = await user.getIdToken();
 
