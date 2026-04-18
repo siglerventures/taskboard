@@ -139,7 +139,7 @@ onAuthStateChanged(auth, (user) => {
   .top-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
   .top-bar h1 { font-size: 18px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
   .top-bar input[type="text"] { flex: 1; min-width: 160px; padding: 7px 12px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
-  .top-bar select { padding: 7px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
+  .top-bar select { padding: 7px 10px; border: 1.5px solid #a78bfa; border-radius: 8px; font-size: 13px; background: #f5f3ff; color: #4c1d95; font-weight: 600; min-width: 140px; }
   .top-bar button { padding: 7px 13px; border-radius: 8px; border: 0.5px solid #ddd; background: #fff; font-size: 13px; cursor: pointer; font-weight: 500; white-space: nowrap; }
   .top-bar button:hover { background: #f0ede6; }
   .top-bar button.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
@@ -214,8 +214,8 @@ onAuthStateChanged(auth, (user) => {
   .cat-chip .chip-del { cursor: pointer; color: #ccc; font-size: 15px; line-height: 1; border: none; background: none; padding: 0; }
   .cat-chip .chip-del:hover { color: #e53e3e; }
   .task-search-wrap { position: relative; display: flex; align-items: center; }
-  .task-search { padding: 6px 12px 6px 32px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; width: 180px; }
-  .task-search-icon { position: absolute; left: 10px; color: #bbb; font-size: 13px; pointer-events: none; }
+  .task-search { padding: 6px 12px 6px 42px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; width: 180px; }
+  .task-search-icon { position: absolute; left: 8px; color: #bbb; font-size: 11px; pointer-events: none; }
   .done-search { padding: 5px 10px 5px 28px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 12px; background: #fff; flex: 1; max-width: 200px; }
   .done-search-wrap { position: relative; display: flex; align-items: center; }
   .done-search-icon { position: absolute; left: 8px; color: #bbb; font-size: 11px; pointer-events: none; }
@@ -299,6 +299,54 @@ onAuthStateChanged(auth, (user) => {
   .modal-actions button.danger { color: #e53e3e; }
   .edit-priority-btns { display: flex; gap: 8px; margin-top: 4px; }
   .edit-priority-btns .priority-btn { flex: 1; padding: 8px; font-size: 12px; }
+
+/* AI TASK BAR */
+.ai-task-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #f8f4ff;
+  border-bottom: 1px solid #e2d9f3;
+  flex-wrap: wrap;
+  position: relative;
+}
+.ai-icon { font-size: 18px; flex-shrink: 0; }
+.ai-task-bar input[type="text"] {
+  flex: 1;
+  min-width: 280px;
+  padding: 7px 12px;
+  border: 1.5px solid #c4b5e8;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+}
+.ai-task-bar input[type="text"]:focus { border-color: #8b5cf6; }
+.ai-ask-btn {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.ai-ask-btn:hover { background: #6d28d9; }
+.ai-ask-btn:disabled { background: #a78bca; cursor: not-allowed; }
+.ai-task-response {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ai-task-response.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.ai-task-response.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+.ai-task-response.thinking { background: #f5f3ff; border: 1px solid #e2d9f3; color: #6d28d9; }
 </style>
 </head>
 <body>
@@ -311,7 +359,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.6</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.7</div>
   </div>
 </div>
 
@@ -335,15 +383,16 @@ onAuthStateChanged(auth, (user) => {
     <option value="alpha">Alphabetical</option>
     <option value="added">Date added</option>
   </select>
-  <div class="task-search-wrap">
-    <span class="task-search-icon">🔍</span>
-    <input type="text" class="task-search" id="task-search-input" placeholder="Search tasks..." oninput="applyTaskSearch()">
-  </div>
-  <div style="display:flex;gap:6px;margin-left:auto;flex-shrink:0;">
-    <button onclick="exportData()" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;">⬇ Export</button>
-    <button onclick="document.getElementById('import-input').click()" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;">⬆ Import</button>
-  </div>
+  <input type="text" class="task-search" id="task-search-input" placeholder="🔍 Search tasks..." oninput="applyTaskSearch()" style="padding:7px 12px;">
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
+</div>
+
+<!-- AI TASK BAR -->
+<div class="ai-task-bar" id="ai-task-bar">
+  <span class="ai-icon">🤖</span>
+  <input type="text" id="ai-task-input" placeholder="Ask AI — 'Add clean windows for Austen as high priority'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" />
+  <button class="ai-ask-btn" id="ai-ask-btn" onclick="askAI()">Ask</button>
+  <div id="ai-task-response" class="ai-task-response" style="display:none;"></div>
 </div>
 <div class="save-notice" id="save-notice"></div>
 <!-- MOBILE COLUMN PICKER -->
@@ -1564,6 +1613,163 @@ function tbRestore(event) {
   };
   reader.readAsText(file);
 }
+
+// ── AI TASK ASSISTANT ──────────────────────────────────────
+async function askAI() {
+  const input = document.getElementById('ai-task-input');
+  const btn = document.getElementById('ai-ask-btn');
+  const responseDiv = document.getElementById('ai-task-response');
+  const q = input.value.trim();
+  if (!q) return;
+
+  btn.disabled = true;
+  responseDiv.className = 'ai-task-response thinking';
+  responseDiv.style.display = 'block';
+  responseDiv.textContent = '🤖 Thinking...';
+
+  // Build context for the AI
+  const catNames = categories.map(c => c.id).join(', ');
+  const peopleList = PEOPLE.join(', ');
+  const taskSummary = tasks.slice(0, 30).map(t =>
+    `ID:${t.id} "${t.text}" cat:${t.cat} assignee:${t.assignee} priority:${t.priority} col:${t.col}`
+  ).join('\n');
+
+  const systemPrompt = `You are a task board assistant for Philinity Task Board. You help manage tasks by interpreting natural language commands.
+
+Available categories (use exact id): ${catNames}
+Available people (use exact name): ${peopleList}
+Valid priorities: high, medium, low
+Valid columns (same as category ids, tasks live in their category column)
+
+Current tasks (first 30):
+${taskSummary}
+
+You must respond ONLY with valid JSON — no markdown, no explanation:
+
+For ADDING a task:
+{"action":"add","text":"Task text","cat":"category_id","assignee":"Person","priority":"high|medium|low"}
+
+For UPDATING a task (change text, priority, assignee, or category):
+{"action":"update","id":<task_id>,"changes":{"text":"new text","priority":"high","assignee":"Person","cat":"category_id"}}
+
+For COMPLETING/MOVING a task to done:
+{"action":"complete","id":<task_id>}
+
+For DELETING a task:
+{"action":"delete","id":<task_id>}
+
+For multiple operations, return an array: [{"action":...}, {"action":...}]
+
+If you cannot determine the action or category, return:
+{"action":"error","message":"Brief explanation of what you need"}
+
+Rules:
+- Match person names case-insensitively (Phil, Trinity, Austen)
+- Match category names fuzzy (e.g. "autoflag" matches autoflag category)
+- Default assignee if not specified: Phil
+- Default priority if not specified: medium
+- Default category if not specified: first available category`;
+
+  try {
+    const user = firebase.auth().currentUser;
+    if (!user) throw new Error('Not signed in');
+    const idToken = await user.getIdToken();
+
+    const res = await fetch('https://us-central1-philinity-893d2.cloudfunctions.net/askAI', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + idToken
+      },
+      body: JSON.stringify({
+        app: 'taskboard',
+        system: systemPrompt,
+        messages: [{ role: 'user', content: q }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const raw = data.content?.find(b => b.type === 'text')?.text || '{}';
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+
+    // Handle array or single action
+    const actions = Array.isArray(parsed) ? parsed : [parsed];
+    const results = [];
+
+    for (const action of actions) {
+      if (action.action === 'add') {
+        const cat = categories.find(c => c.id === action.cat) ? action.cat : categories[0]?.id;
+        const newTask = {
+          id: nextId++,
+          text: action.text,
+          cat: cat,
+          col: cat,
+          priority: action.priority || 'medium',
+          assignee: action.assignee || 'Phil',
+          dateAdded: new Date().toISOString()
+        };
+        tasks.push(newTask);
+        if (!taskOrder[cat]) taskOrder[cat] = [];
+        taskOrder[cat].unshift(newTask.id);
+        results.push(`✅ Added: "${action.text}" → ${action.assignee || 'Phil'} (${action.priority || 'medium'})`);
+
+      } else if (action.action === 'update') {
+        const task = tasks.find(t => t.id === action.id);
+        if (task) {
+          Object.assign(task, action.changes);
+          results.push(`✅ Updated task #${action.id}`);
+        } else {
+          results.push(`⚠️ Task #${action.id} not found`);
+        }
+
+      } else if (action.action === 'complete') {
+        const task = tasks.find(t => t.id === action.id);
+        if (task) {
+          completionLog.unshift({
+            id: task.id, text: task.text, cat: task.cat,
+            assignee: task.assignee, priority: task.priority,
+            completedAt: new Date().toISOString(), dateAdded: task.dateAdded
+          });
+          tasks = tasks.filter(t => t.id !== action.id);
+          results.push(`✅ Completed: "${task.text}"`);
+        } else {
+          results.push(`⚠️ Task #${action.id} not found`);
+        }
+
+      } else if (action.action === 'delete') {
+        const task = tasks.find(t => t.id === action.id);
+        if (task) {
+          tasks = tasks.filter(t => t.id !== action.id);
+          results.push(`✅ Deleted: "${task.text}"`);
+        } else {
+          results.push(`⚠️ Task #${action.id} not found`);
+        }
+
+      } else if (action.action === 'error') {
+        results.push(`❓ ${action.message}`);
+      }
+    }
+
+    save();
+    renderAll();
+    updateStats();
+
+    responseDiv.className = 'ai-task-response success';
+    responseDiv.textContent = results.join(' · ');
+    input.value = '';
+
+    // Auto-hide after 4 seconds
+    setTimeout(() => { responseDiv.style.display = 'none'; }, 4000);
+
+  } catch(e) {
+    responseDiv.className = 'ai-task-response error';
+    responseDiv.textContent = '❌ ' + e.message;
+  }
+
+  btn.disabled = false;
+}
+
 </script>
 
 <!-- DATA MODAL -->
@@ -1602,6 +1808,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.6 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.7 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
