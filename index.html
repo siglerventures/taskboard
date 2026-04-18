@@ -344,17 +344,53 @@ onAuthStateChanged(auth, (user) => {
 }
 .ai-ask-btn:hover { background: #6d28d9; }
 .ai-ask-btn:disabled { background: #a78bca; cursor: not-allowed; }
-.ai-task-response {
+/* AI CHAT THREAD */
+.ai-thread {
   width: 100%;
-  margin-top: 4px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  margin-top: 6px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e2d9f3;
+  max-height: 380px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   font-size: 13px;
   line-height: 1.5;
 }
-.ai-task-response.success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-.ai-task-response.error { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
-.ai-task-response.thinking { background: #f5f3ff; border: 1px solid #e2d9f3; color: #6d28d9; }
+.ai-thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 0.5px solid #f0ede6;
+  position: sticky; top: -10px;
+  background: #fff;
+  z-index: 2;
+}
+.ai-thread-title { font-size: 11px; font-weight: 600; color: #6d28d9; text-transform: uppercase; letter-spacing: 0.05em; }
+.ai-thread-tools { display: flex; gap: 6px; }
+.ai-thread-tools button {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 0.5px solid #e2d9f3;
+  background: #f8f4ff;
+  color: #6d28d9;
+  cursor: pointer;
+  font-weight: 500;
+}
+.ai-thread-tools button:hover { background: #ede9fe; }
+.ai-msg { padding: 6px 10px; border-radius: 8px; max-width: 92%; word-wrap: break-word; white-space: pre-wrap; }
+.ai-msg.user { align-self: flex-end; background: #ede9fe; color: #3b1a78; border: 0.5px solid #c4b5e8; }
+.ai-msg.assistant { align-self: flex-start; background: #f4f3ee; color: #1a1a1a; border: 0.5px solid #e0ddd6; }
+.ai-msg.assistant.mutation { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.ai-msg.assistant.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.ai-msg.assistant.thinking { background: #f5f3ff; border-color: #e2d9f3; color: #6d28d9; font-style: italic; }
+.ai-msg-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.6; margin-bottom: 2px; }
 </style>
 </head>
 <body>
@@ -367,7 +403,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.12</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.13</div>
   </div>
 </div>
 
@@ -401,7 +437,16 @@ onAuthStateChanged(auth, (user) => {
   <span class="ai-icon">🤖</span>
   <input type="text" id="ai-task-input" placeholder="Ask AI — add a task OR ask 'how many windows cleaned by who?'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" enterkeyhint="send" />
   <button class="ai-ask-btn" id="ai-ask-btn" onclick="askAI()">Ask</button>
-  <div id="ai-task-response" class="ai-task-response" style="display:none;"></div>
+  <div id="ai-thread" class="ai-thread" style="display:none;">
+    <div class="ai-thread-header">
+      <span class="ai-thread-title">🤖 AI Conversation</span>
+      <div class="ai-thread-tools">
+        <button onclick="clearAIThread()" title="Clear and start fresh">🧹 New Chat</button>
+        <button onclick="closeAIThread()" title="Close thread">✕ Close</button>
+      </div>
+    </div>
+    <div id="ai-messages" style="display:flex;flex-direction:column;gap:8px;"></div>
+  </div>
 </div>
 <div class="save-notice" id="save-notice"></div>
 <!-- MOBILE COLUMN PICKER -->
@@ -1717,27 +1762,69 @@ function tbRestore(event) {
 }
 
 // ── AI TASK ASSISTANT ──────────────────────────────────────
+// Maintains conversation across turns so follow-ups have context
+let aiConversation = [];   // array of {role, content} for the API
+let aiThreadOpen = false;
+
+function openAIThread() {
+  const thread = document.getElementById('ai-thread');
+  if (thread) thread.style.display = 'flex';
+  aiThreadOpen = true;
+}
+
+function closeAIThread() {
+  const thread = document.getElementById('ai-thread');
+  if (thread) thread.style.display = 'none';
+  aiThreadOpen = false;
+}
+
+function clearAIThread() {
+  aiConversation = [];
+  const msgs = document.getElementById('ai-messages');
+  if (msgs) msgs.innerHTML = '';
+  const input = document.getElementById('ai-task-input');
+  if (input) input.focus();
+}
+
+function appendAIMessage(role, text, kind) {
+  // role = 'user' | 'assistant', kind = 'mutation' | 'error' | 'thinking' | undefined
+  const msgs = document.getElementById('ai-messages');
+  if (!msgs) return null;
+  const div = document.createElement('div');
+  div.className = 'ai-msg ' + role + (kind ? ' ' + kind : '');
+  div.innerHTML = `<div class="ai-msg-label">${role === 'user' ? 'You' : '🤖 AI'}</div>` + escapeHtml(text);
+  msgs.appendChild(div);
+  // Autoscroll to latest
+  const thread = document.getElementById('ai-thread');
+  if (thread) thread.scrollTop = thread.scrollHeight;
+  return div;
+}
+
 async function askAI() {
   const input = document.getElementById('ai-task-input');
   const btn = document.getElementById('ai-ask-btn');
-  const responseDiv = document.getElementById('ai-task-response');
   const q = input.value.trim();
   if (!q) return;
 
-  btn.disabled = true;
-  responseDiv.className = 'ai-task-response thinking';
-  responseDiv.style.display = 'block';
-  responseDiv.textContent = '🤖 Thinking...';
+  openAIThread();
+  appendAIMessage('user', q);
+  input.value = '';
 
-  // Build context for the AI
+  btn.disabled = true;
+  const thinkingDiv = appendAIMessage('assistant', '🤖 Thinking...', 'thinking');
+
+  // Build fresh context each turn so AI always sees current board state
   const catNames = categories.map(c => c.id).join(', ');
   const peopleList = PEOPLE.join(', ');
   const taskSummary = tasks.map(t =>
     `ID:${t.id} "${t.text}" cat:${t.cat} assignee:${t.assignee} priority:${t.priority} col:${t.col}`
   ).join('\n');
 
-  // Include completion history so the AI can answer questions about past work
-  const historySummary = completionLog.slice(0, 150).map(l => {
+  // Include completion history so the AI can answer analytics questions like "this year vs last year"
+  // Safety ceiling of 2000 entries (~36k tokens) — well under Sonnet's 200k input window
+  const HISTORY_CAP = 2000;
+  const logToSend = completionLog.slice(0, HISTORY_CAP);
+  const historySummary = logToSend.map(l => {
     const date = l.completedAt ? l.completedAt.slice(0, 10) : 'unknown';
     return `"${l.text}" cat:${l.cat} assignee:${l.assignee || 'Phil'} completed:${date}`;
   }).join('\n');
@@ -1753,7 +1840,7 @@ Total completed tasks in history: ${completionLog.length}
 ACTIVE TASKS (all ${tasks.length}):
 ${taskSummary}
 
-COMPLETION HISTORY (most recent ${Math.min(150, completionLog.length)}):
+COMPLETION HISTORY (${logToSend.length} entries${completionLog.length > HISTORY_CAP ? ' — capped at most recent ' + HISTORY_CAP + ' of ' + completionLog.length : ' — complete'}):
 ${historySummary}
 
 You must respond ONLY with valid JSON — no markdown, no explanation:
@@ -1770,22 +1857,25 @@ For COMPLETING a task:
 For DELETING a task:
 {"action":"delete","id":<task_id>}
 
-For ANSWERING a QUESTION about tasks/history (counts, who-did-what, what's-pending, summaries, analytics):
+For ANSWERING a QUESTION about tasks/history (counts, who-did-what, what's-pending, summaries, analytics, follow-ups to previous questions):
 {"action":"answer","message":"Your plain-language answer here. Be specific and cite task text + assignees + dates."}
 
 For multiple operations, return an array.
 
-If you cannot determine the action or category:
+If you cannot determine the action:
 {"action":"error","message":"Brief explanation of what you need"}
 
 Rules:
-- Questions like "how many times did we...", "when did I last...", "who did...", "what's pending for..." are ANSWER actions, not manage actions
+- Questions like "how many times...", "when did I last...", "who did...", "what's pending for..." are ANSWER actions
+- Follow-up questions ("and this month?", "who did the most?", "what about Trinity's?") should reference prior context from the conversation
 - When answering, look at BOTH active tasks AND completion history
 - Count matches inclusively — "cleaned windows" matches "clean windows", "window cleaning", etc.
 - Always cite specific names and dates when available
-- Match person names case-insensitively
-- Match category names fuzzy
+- Match person names case-insensitively, categories fuzzy
 - Default assignee: Phil, default priority: medium, default category: first available`;
+
+  // Add this turn to conversation
+  aiConversation.push({ role: 'user', content: q });
 
   try {
     const user = window._fbAuth?.currentUser;
@@ -1801,18 +1891,21 @@ Rules:
       body: JSON.stringify({
         app: 'taskboard',
         system: systemPrompt,
-        messages: [{ role: 'user', content: q }]
+        messages: aiConversation
       })
     });
 
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     const raw = data.content?.find(b => b.type === 'text')?.text || '{}';
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
 
-    // Handle array or single action
+    // Save assistant's raw response so next turn has context
+    aiConversation.push({ role: 'assistant', content: raw });
+
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
     const actions = Array.isArray(parsed) ? parsed : [parsed];
     const results = [];
+    let kind = undefined; // becomes 'mutation' if any action changes data
 
     for (const action of actions) {
       if (action.action === 'add') {
@@ -1830,12 +1923,14 @@ Rules:
         if (!taskOrder[cat]) taskOrder[cat] = [];
         taskOrder[cat].unshift(newTask.id);
         results.push(`✅ Added: "${action.text}" → ${action.assignee || 'Phil'} (${action.priority || 'medium'})`);
+        kind = 'mutation';
 
       } else if (action.action === 'update') {
         const task = tasks.find(t => t.id === action.id);
         if (task) {
           Object.assign(task, action.changes);
           results.push(`✅ Updated task #${action.id}`);
+          kind = 'mutation';
         } else {
           results.push(`⚠️ Task #${action.id} not found`);
         }
@@ -1850,6 +1945,7 @@ Rules:
           });
           tasks = tasks.filter(t => t.id !== action.id);
           results.push(`✅ Completed: "${task.text}"`);
+          kind = 'mutation';
         } else {
           results.push(`⚠️ Task #${action.id} not found`);
         }
@@ -1859,6 +1955,7 @@ Rules:
         if (task) {
           tasks = tasks.filter(t => t.id !== action.id);
           results.push(`✅ Deleted: "${task.text}"`);
+          kind = 'mutation';
         } else {
           results.push(`⚠️ Task #${action.id} not found`);
         }
@@ -1871,24 +1968,24 @@ Rules:
       }
     }
 
-    // Determine whether this was a read-only Q&A (answer action) or a data mutation
-    const wasReadOnly = actions.every(a => a.action === 'answer' || a.action === 'error');
-    if (!wasReadOnly) { save(); renderAll(); updateStats(); }
+    // Remove the thinking bubble
+    if (thinkingDiv && thinkingDiv.parentNode) thinkingDiv.parentNode.removeChild(thinkingDiv);
 
-    responseDiv.className = 'ai-task-response success';
-    responseDiv.textContent = results.join(' · ');
-    input.value = '';
+    // Show AI reply in thread
+    appendAIMessage('assistant', results.join('\n'), kind);
 
-    // Answers linger so you can read them; mutations auto-hide quickly
-    const hideMs = wasReadOnly ? 20000 : 4000;
-    setTimeout(() => { responseDiv.style.display = 'none'; }, hideMs);
+    // Persist board changes if any
+    if (kind === 'mutation') { save(); renderAll(); updateStats(); }
 
   } catch(e) {
-    responseDiv.className = 'ai-task-response error';
-    responseDiv.textContent = '❌ ' + e.message;
+    if (thinkingDiv && thinkingDiv.parentNode) thinkingDiv.parentNode.removeChild(thinkingDiv);
+    appendAIMessage('assistant', '❌ ' + (e.message || 'Something went wrong'), 'error');
+    // Roll back the user turn in the API conversation so retries don't loop on the bad state
+    aiConversation.pop();
   }
 
   btn.disabled = false;
+  input.focus();
 }
 
 
@@ -1896,11 +1993,10 @@ function goHome() {
   // Clear search
   const searchInput = document.getElementById('task-search-input');
   if (searchInput) { searchInput.value = ''; applyTaskSearch(); }
-  // Clear AI bar
+  // Clear AI bar and close thread
   const aiInput = document.getElementById('ai-task-input');
   if (aiInput) aiInput.value = '';
-  const aiResponse = document.getElementById('ai-task-response');
-  if (aiResponse) aiResponse.style.display = 'none';
+  if (typeof closeAIThread === 'function') closeAIThread();
   // On mobile: reset to user's default category tab
   const isMobile = window.innerWidth <= 600;
   if (isMobile) {
@@ -1972,6 +2068,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.12 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.13 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
