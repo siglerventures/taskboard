@@ -360,7 +360,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.7</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.8</div>
   </div>
 </div>
 
@@ -368,7 +368,7 @@ onAuthStateChanged(auth, (user) => {
 <!-- TOP BAR -->
 <div class="top-bar">
   <h1 style="cursor:pointer;" onclick="goHome()" title="Return to home">📋 Philinity's Task Board</h1>
-  <input type="text" id="new-task-text" placeholder="New task..." />
+  <input type="text" id="new-task-text" placeholder="New task..." enterkeyhint="done" />
   <select id="new-task-cat"></select>
   <div class="priority-btns">
     <button class="priority-btn" id="pb-high" onclick="setNewPriority('high')">🔴 High</button>
@@ -384,14 +384,15 @@ onAuthStateChanged(auth, (user) => {
     <option value="alpha">Alphabetical</option>
     <option value="added">Date added</option>
   </select>
-  <input type="text" class="task-search" id="task-search-input" placeholder="🔍 Search tasks..." oninput="applyTaskSearch()" style="padding:7px 12px;">
+  <input type="text" class="task-search" id="task-search-input" placeholder="🔍 Search tasks..." oninput="applyTaskSearch()" onkeydown="if(event.key==='Enter')applyTaskSearch()" enterkeyhint="search" style="padding:7px 12px;">
+  <button onclick="applyTaskSearch()" title="Search" style="padding:7px 14px;border-radius:8px;border:0.5px solid #ddd;background:#fff;font-size:14px;cursor:pointer;font-weight:500;white-space:nowrap;">🔍</button>
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
 </div>
 
 <!-- AI TASK BAR -->
 <div class="ai-task-bar" id="ai-task-bar">
   <span class="ai-icon">🤖</span>
-  <input type="text" id="ai-task-input" placeholder="Ask AI — 'Add clean windows for Austen as high priority'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" />
+  <input type="text" id="ai-task-input" placeholder="Ask AI — 'Add clean windows for Austen as high priority'" autocomplete="off" onkeydown="if(event.key==='Enter')askAI()" enterkeyhint="send" />
   <button class="ai-ask-btn" id="ai-ask-btn" onclick="askAI()">Ask</button>
   <div id="ai-task-response" class="ai-task-response" style="display:none;"></div>
 </div>
@@ -468,7 +469,8 @@ onAuthStateChanged(auth, (user) => {
   <span id="history-arrow" style="font-size:12px;color:#888;">▾</span>
   <div class="done-search-wrap" id="done-search-wrap" style="display:none;" onclick="event.stopPropagation()">
     <span class="done-search-icon">🔍</span>
-    <input type="text" class="done-search" id="done-search-input" placeholder="Search completed..." oninput="renderHistory()">
+    <input type="text" class="done-search" id="done-search-input" placeholder="Search completed..." oninput="renderHistory()" onkeydown="if(event.key==='Enter')renderHistory()" enterkeyhint="search">
+    <button onclick="event.stopPropagation();renderHistory()" title="Search" style="padding:4px 10px;border-radius:6px;border:0.5px solid #ddd;background:#fff;font-size:13px;cursor:pointer;margin-left:4px;">🔍</button>
   </div>
 </div>
 <div class="bottom-section" id="history-panel" style="grid-template-columns: 0.9fr 1fr;display:none;">
@@ -1823,6 +1825,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.7 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.8 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
