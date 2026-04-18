@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://*.firebaseio.com https://apis.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com; img-src 'self' data: blob: https:; frame-src https://*.firebaseio.com https://*.firebaseapp.com https://philinity-893d2.firebaseapp.com https://accounts.google.com; object-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://*.firebaseio.com https://apis.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://us-central1-philinity-893d2.cloudfunctions.net; img-src 'self' data: blob: https:; frame-src https://*.firebaseio.com https://*.firebaseapp.com https://philinity-893d2.firebaseapp.com https://accounts.google.com; object-src 'none';">
 <title>Philinity's Task Board</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script type="module">
@@ -367,7 +367,7 @@ onAuthStateChanged(auth, (user) => {
 
 <!-- TOP BAR -->
 <div class="top-bar">
-  <h1>📋 Philinity's Task Board</h1>
+  <h1 style="cursor:pointer;" onclick="goHome()" title="Return to home">📋 Philinity's Task Board</h1>
   <input type="text" id="new-task-text" placeholder="New task..." />
   <select id="new-task-cat"></select>
   <div class="priority-btns">
@@ -1769,6 +1769,20 @@ Rules:
   }
 
   btn.disabled = false;
+}
+
+
+function goHome() {
+  // Clear search
+  const searchInput = document.getElementById('task-search-input');
+  if (searchInput) { searchInput.value = ''; applyTaskSearch(); }
+  // Clear AI bar
+  const aiInput = document.getElementById('ai-task-input');
+  if (aiInput) aiInput.value = '';
+  const aiResponse = document.getElementById('ai-task-response');
+  if (aiResponse) aiResponse.style.display = 'none';
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 </script>
