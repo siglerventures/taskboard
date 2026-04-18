@@ -35,10 +35,24 @@ window._fbOnValue = onValue;
 window._fbReady = true;
 
 
+window._firebaseDataLoaded = false;
+
 onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
-  if (!data) return;
+  if (!data) {
+    if (window._firebaseDataLoaded) return;
+    window._firebaseDataLoaded = true;
+    tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
+    categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    completionLog = [];
+    taskOrder = {};
+    nextId = 100;
+    nextCatId = 50;
+    rebuildCatSelects(); renderAll(); renderHistory();
+    return;
+  }
   if (window._suppressListener) return;
+  window._firebaseDataLoaded = true;
   let loadedTasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
   completionLog = data.completionLog || [];
   // Migrate any old col:done tasks to completionLog
@@ -65,7 +79,15 @@ onValue(dataRef, (snapshot) => {
   showSyncNotice('Synced ☁️');
 }, (error) => {
   console.error('Task Board Firebase listener failed:', error);
-  showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
+  if (!window._firebaseDataLoaded) {
+    load();
+    rebuildCatSelects();
+    renderAll();
+    renderHistory();
+    showSyncNotice('⚠️ Offline mode — using local cache');
+  } else {
+    showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
+  }
 });
 </script>
 <style>
@@ -251,7 +273,7 @@ onValue(dataRef, (snapshot) => {
       <button type="submit" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
     </form>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.2</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.4</div>
   </div>
 </div>
 <script>
@@ -1474,7 +1496,19 @@ function showVerse() {
 }
 showVerse();
 setInterval(showVerse, 60 * 60 * 1000);
-load(); setNewPriority('medium'); rebuildCatSelects(); renderAll(); renderHistory();
+setNewPriority('medium');
+rebuildCatSelects();
+showSyncNotice('Loading from cloud...');
+// If Firebase hasn't responded in 4 seconds, fall back to localStorage
+setTimeout(() => {
+  if (!window._firebaseDataLoaded) {
+    load();
+    rebuildCatSelects();
+    renderAll();
+    renderHistory();
+    showSyncNotice('⚠️ Slow connection — using local cache');
+  }
+}, 4000);
 
 // ── DATA MANAGER ─────────────────────────────────────────
 function openDataModal() {
@@ -1583,6 +1617,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.3 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
