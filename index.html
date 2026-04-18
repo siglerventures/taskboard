@@ -236,7 +236,8 @@ onAuthStateChanged(auth, (user) => {
   @media (max-width: 600px) {
     body { padding: 0.75rem; }
     .top-bar { gap: 6px; }
-    .top-bar h1 { font-size: 16px; }
+    .top-bar h1 { font-size: 16px; padding: 8px 4px; }
+    .top-bar h1:active { background: #eae8e1; border-radius: 8px; }
     .top-bar input[type="text"] { min-width: 120px; font-size: 16px; padding: 9px 10px; }
     .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; }
     .top-bar button { min-height: 40px; font-size: 13px; padding: 9px 12px; }
@@ -248,6 +249,8 @@ onAuthStateChanged(auth, (user) => {
     #mobile-col-picker { display: block !important; }
     .mobile-tab { padding: 8px 14px; border-radius: 20px; border: 1.5px solid #e0ddd6; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 5px; }
     .mobile-tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .mobile-tab.has-search-match { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+    .mobile-tab.has-search-match::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6366f1; display: inline-block; margin-left: 4px; }
     .task { padding: 12px 10px; }
     .task-text { font-size: 14px; }
     .check { width: 22px; height: 22px; flex-shrink: 0; }
@@ -364,7 +367,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.9</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.11</div>
   </div>
 </div>
 
@@ -1196,12 +1199,50 @@ function colCtxDelete() { const id = colCtxId; closeColCtxMenu(); if (id) remove
 
 function applyTaskSearch() {
   const q = (document.getElementById('task-search-input')?.value || '').toLowerCase().trim();
-  document.querySelectorAll('.task').forEach(el => {
+  const isMobile = window.innerWidth <= 600;
+
+  // Test if a task matches the query
+  const matches = (el) => {
     const text = el.querySelector('.task-text')?.textContent?.toLowerCase() || '';
     const badge = el.querySelector('.cat-badge')?.textContent?.toLowerCase() || '';
     const assignee = el.querySelector('.assignee-badge')?.textContent?.toLowerCase() || '';
-    el.style.display = (!q || text.includes(q) || badge.includes(q) || assignee.includes(q)) ? '' : 'none';
+    return !q || text.includes(q) || badge.includes(q) || assignee.includes(q);
+  };
+
+  // Reset every task's inline display first
+  document.querySelectorAll('.task').forEach(el => {
+    el.style.display = matches(el) ? '' : 'none';
   });
+
+  // Mobile: find all categories with at least one matching task, show a dotted indicator on their tabs,
+  // and auto-switch the active tab to the first match so the user actually sees a result.
+  if (isMobile && q) {
+    const matchingCats = new Set();
+    document.querySelectorAll('.col').forEach(col => {
+      const colId = col.dataset.col;
+      const hasMatch = [...col.querySelectorAll('.task')].some(t => matches(t));
+      if (hasMatch) matchingCats.add(colId);
+    });
+
+    // Auto-switch to first matching category if current active tab has no matches
+    if (matchingCats.size > 0 && !matchingCats.has(activeMobileCol)) {
+      const firstMatch = [...matchingCats][0];
+      activeMobileCol = firstMatch;
+      renderAll();
+      // Re-apply search after re-render
+      document.querySelectorAll('.task').forEach(el => {
+        el.style.display = matches(el) ? '' : 'none';
+      });
+    }
+
+    // Add dot indicator to tabs that have matches
+    document.querySelectorAll('.mobile-tab').forEach(tab => {
+      tab.classList.toggle('has-search-match', matchingCats.has(tab.dataset.colId));
+    });
+  } else {
+    // Clear dots when no search or not mobile
+    document.querySelectorAll('.mobile-tab.has-search-match').forEach(tab => tab.classList.remove('has-search-match'));
+  }
 }
 
 function addTask() {
@@ -1841,9 +1882,38 @@ function goHome() {
   if (aiInput) aiInput.value = '';
   const aiResponse = document.getElementById('ai-task-response');
   if (aiResponse) aiResponse.style.display = 'none';
+  // On mobile: reset to user's default category tab
+  const isMobile = window.innerWidth <= 600;
+  if (isMobile) {
+    const targetCat = userMobileDefault || 'personal';
+    if (activeMobileCol !== targetCat) {
+      activeMobileCol = targetCat;
+      if (typeof renderAll === 'function') renderAll();
+      if (typeof saveUserMobileLast === 'function') saveUserMobileLast(targetCat);
+    }
+  }
   // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Robust mobile tap handling for the h1 title — attach a touch listener that prevents ghost clicks
+(function attachTitleTouchHandler() {
+  const h1 = document.querySelector('.top-bar h1');
+  if (!h1) return;
+  let touchStartY = 0, touchStartX = 0;
+  h1.addEventListener('touchstart', (e) => {
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  h1.addEventListener('touchend', (e) => {
+    const t = e.changedTouches[0];
+    // Only treat as tap if finger didn't move more than 10px (not a scroll)
+    if (Math.abs(t.clientY - touchStartY) < 10 && Math.abs(t.clientX - touchStartX) < 10) {
+      e.preventDefault();
+      goHome();
+    }
+  }, { passive: false });
+})();
 
 </script>
 
@@ -1883,6 +1953,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.9 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.11 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
