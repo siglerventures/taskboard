@@ -11,7 +11,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 const firebaseConfig = {
   apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
   authDomain: "philinity-893d2.firebaseapp.com",
@@ -24,10 +24,19 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
-await signInAnonymously(auth);
+const provider = new GoogleAuthProvider();
+
+// Sign in with Google if not already signed in
+if (!auth.currentUser) {
+  try {
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    console.error('Google sign-in failed:', e);
+  }
+}
 const dataRef = ref(db, 'taskboard');
 window._fbRef = dataRef;
-window._fbConfigRef = ref(db, 'config/taskboard_password');
+// config/taskboard_password no longer used — Google Sign-In handles auth
 window._fbSet = set;
 window._fbGet = get;
 window._fbRefFn = ref;
@@ -37,7 +46,18 @@ window._fbReady = true;
 
 window._firebaseDataLoaded = false;
 
-onValue(dataRef, (snapshot) => {
+// Wrap onValue in onAuthStateChanged to guarantee auth token is ready on mobile
+onAuthStateChanged(auth, (user) => {
+  if (!user) return;
+  // UID whitelist check
+  if (!['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'].includes(user.uid)) {
+    signOut(auth);
+    return;
+  }
+  // Hide auth gate
+  document.getElementById('auth-gate').style.display = 'none';
+  document.body.style.overflow = '';
+  onValue(dataRef, (snapshot) => {
   const data = snapshot.val();
   if (!data) {
     if (window._firebaseDataLoaded) return;
@@ -77,17 +97,18 @@ onValue(dataRef, (snapshot) => {
   renderAll();
   renderHistory();
   showSyncNotice('Synced ☁️');
-}, (error) => {
-  console.error('Task Board Firebase listener failed:', error);
-  if (!window._firebaseDataLoaded) {
-    load();
-    rebuildCatSelects();
-    renderAll();
-    renderHistory();
-    showSyncNotice('⚠️ Offline mode — using local cache');
-  } else {
-    showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
-  }
+  }, (error) => {
+    console.error('Task Board Firebase listener failed:', error);
+    if (!window._firebaseDataLoaded) {
+      load();
+      rebuildCatSelects();
+      renderAll();
+      renderHistory();
+      showSyncNotice('⚠️ Offline mode — using local cache');
+    } else {
+      showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
+    }
+  });
 });
 </script>
 <style>
@@ -265,59 +286,44 @@ onValue(dataRef, (snapshot) => {
   <div style="background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;gap:14px;box-sizing:border-box">
     <div style="font-size:40px;line-height:1">📋</div>
     <div style="font-size:22px;font-weight:700;color:#1a1a1a;text-align:center">Philinity's Task Board</div>
-    <div style="font-size:13px;color:#888;text-align:center">Private — Enter password to continue</div>
-    <form onsubmit="event.preventDefault();checkPW()" style="width:100%;display:flex;flex-direction:column;gap:14px;align-items:center;">
-      <input type="text" name="username" autocomplete="username" style="display:none" aria-hidden="true">
-      <input type="password" id="pw-input" placeholder="Password" autocomplete="current-password" autocomplete="current-password"
-        style="background:#f4f3ee;border:1.5px solid #ddd;color:#1a1a1a;padding:14px 18px;border-radius:10px;font-size:16px;outline:none;width:100%;text-align:center;box-sizing:border-box;-webkit-appearance:none">
-      <button type="submit" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none">Unlock</button>
-    </form>
+    <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
+    <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.4</div>
+    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 5.5</div>
   </div>
 </div>
 <script>
-const TB_AUTH_KEY = 'taskboard_auth_v2';
-const TB_AUTH_EXPIRY_DAYS = 30;
-
-function isTBAuthValid() {
-  try {
-    var stored = localStorage.getItem(TB_AUTH_KEY);
-    if (!stored) return false;
-    var data = JSON.parse(stored);
-    return (Date.now() - data.ts) < (TB_AUTH_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-  } catch(e) { return false; }
-}
-
+// Show auth gate — Google Sign-In will hide it
 (function() {
-  if (!isTBAuthValid()) {
-    document.getElementById('auth-gate').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    setTimeout(function() { document.getElementById('pw-input').focus(); }, 300);
-  }
+  document.getElementById('auth-gate').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
 })();
 
-async function checkPW() {
-  var v = document.getElementById('pw-input').value;
-  if (!v) return;
-  var correctPW = '1002';
+async const ALLOWED_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
+
+async function googleSignIn() {
   try {
-    var waited = 0;
-    while (!window._fbConfigRef && waited < 3000) { await new Promise(r => setTimeout(r, 100)); waited += 100; }
-    if (window._fbConfigRef && window._fbGet) {
-      var snap = await window._fbGet(window._fbConfigRef);
-      if (snap.exists()) correctPW = snap.val();
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    const uid = result.user.uid;
+    if (!ALLOWED_UIDS.includes(uid)) {
+      await signOut(auth);
+      document.getElementById('pw-error').style.display = 'block';
+      document.getElementById('pw-error').textContent = 'This Google account is not authorized.';
+      return;
     }
-  } catch(e) { console.warn('Using default password', e.message); }
-  if (v === correctPW) {
-    localStorage.setItem(TB_AUTH_KEY, JSON.stringify({ ts: Date.now() }));
     document.getElementById('auth-gate').style.display = 'none';
     document.body.style.overflow = '';
-  } else {
+  } catch(e) {
+    console.error('Sign-in failed:', e);
     document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-input').value = '';
-    document.getElementById('pw-input').focus();
+    document.getElementById('pw-error').textContent = 'Sign-in failed. Please try again.';
   }
+}
+
+async function doSignOut() {
+  await signOut(auth);
+  location.reload();
 }
 </script>
 
@@ -856,7 +862,8 @@ function renderAll() {
   const isMobile = window.innerWidth <= 600;
   // Ensure activeMobileCol is valid
   if (!activeMobileCol || !boardCols.find(c => c.id === activeMobileCol)) {
-    activeMobileCol = boardCols[0]?.id || null;
+    // Default to Personal tab, fallback to first available
+    activeMobileCol = boardCols.find(c => c.id === 'personal')?.id || boardCols[0]?.id || null;
   }
   // Render mobile tab bar
   if (isMobile) {
@@ -1498,17 +1505,6 @@ showVerse();
 setInterval(showVerse, 60 * 60 * 1000);
 setNewPriority('medium');
 rebuildCatSelects();
-showSyncNotice('Loading from cloud...');
-// If Firebase hasn't responded in 4 seconds, fall back to localStorage
-setTimeout(() => {
-  if (!window._firebaseDataLoaded) {
-    load();
-    rebuildCatSelects();
-    renderAll();
-    renderHistory();
-    showSyncNotice('⚠️ Slow connection — using local cache');
-  }
-}, 4000);
 
 // ── DATA MANAGER ─────────────────────────────────────────
 function openDataModal() {
@@ -1617,6 +1613,6 @@ function tbRestore(event) {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev5.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span></div>
 </body>
 </html>
