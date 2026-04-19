@@ -1332,7 +1332,7 @@ function closeColCtxMenu() {
   document.getElementById('col-ctx-overlay').style.display = 'none';
   colCtxId = null;
 }
-function colCtxEdit() { closeColCtxMenu(); if (colCtxId) openCatModal(colCtxId); }
+function colCtxEdit() { const id = colCtxId; closeColCtxMenu(); if (id) openCatModal(id); }
 function colCtxArchive() { const id = colCtxId; closeColCtxMenu(); if (id) toggleArchiveCategory(id); }
 function colCtxDelete() { const id = colCtxId; closeColCtxMenu(); if (id) removeCategory(id); }
 
@@ -2426,6 +2426,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev6.2 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 6.3 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
