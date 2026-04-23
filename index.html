@@ -147,40 +147,40 @@ onAuthStateChanged(auth, (user) => {
 </script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f3ee; min-height: 100vh; padding: 1.25rem 1.5rem; color: #1a1a1a; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000000; min-height: 100vh; padding: 1.25rem 1.5rem; color: #e2e8f0; }
   .top-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
   .top-bar h1 { font-size: 18px; font-weight: 600; margin-right: 4px; white-space: nowrap; }
-  .top-bar input[type="text"] { flex: 1; min-width: 160px; padding: 7px 12px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; }
-  .top-bar select { padding: 7px 10px; border: 1.5px solid #a78bfa; border-radius: 8px; font-size: 13px; background: #f5f3ff; color: #4c1d95; font-weight: 600; min-width: 140px; }
-  .top-bar button { padding: 7px 13px; border-radius: 8px; border: 0.5px solid #ddd; background: #fff; font-size: 13px; cursor: pointer; font-weight: 500; white-space: nowrap; }
-  .top-bar button:hover { background: #f0ede6; }
-  .top-bar button.primary { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-  .top-bar button.primary:hover { background: #333; }
+  .top-bar input[type="text"] { flex: 1; min-width: 160px; padding: 7px 12px; border: 0.5px solid #334155; border-radius: 8px; font-size: 13px; background: #111111; color: #e2e8f0; }
+  .top-bar select { padding: 7px 10px; border: 1.5px solid #a78bfa; border-radius: 8px; font-size: 13px; background: #1e1b4b; color: #c4b5fd; font-weight: 600; min-width: 140px; }
+  .top-bar button { padding: 7px 13px; border-radius: 8px; border: 0.5px solid #334155; background: #1a1a1a; color: #e2e8f0; font-size: 13px; cursor: pointer; font-weight: 500; white-space: nowrap; }
+  .top-bar button:hover { background: #334155; }
+  .top-bar button.primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+  .top-bar button.primary:hover { background: #4f46e5; }
   .priority-btns { display: flex; gap: 5px; flex-shrink: 0; }
-  .priority-btn { padding: 7px 11px; border-radius: 8px; border: 1.5px solid #eee; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; transition: all 0.15s; white-space: nowrap; }
+  .priority-btn { padding: 7px 11px; border-radius: 8px; border: 1.5px solid #334155; font-size: 12px; font-weight: 600; cursor: pointer; background: #1a1a1a; color: #94a3b8; transition: all 0.15s; white-space: nowrap; }
   .priority-btn.selected-high { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
   .priority-btn.selected-medium { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
   .priority-btn.selected-low { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
   .sort-label { font-size: 12px; color: #888; white-space: nowrap; }
   .save-notice { font-size: 11px; color: #4caf50; min-height: 14px; margin-bottom: 0.5rem; }
   .columns-wrap { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; margin-bottom: 1.5rem; }
-  .col { background: #eae8e1; border-radius: 12px; padding: 10px; min-width: 190px; width: 190px; flex-shrink: 0; }
-  .col.drag-over { outline: 2px dashed #888; outline-offset: -2px; }
-  .col.col-drag-over { outline: 2px dashed #6366f1; outline-offset: -2px; background: #eeeaff; }
+  .col { background: #111111; border-radius: 12px; padding: 10px; min-width: 190px; width: 190px; flex-shrink: 0; }
+  .col.drag-over { outline: 2px dashed #475569; outline-offset: -2px; }
+  .col.col-drag-over { outline: 2px dashed #6366f1; outline-offset: -2px; background: #1e1b4b; }
   .col-header { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
   .col-icon { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
-  .col-title { font-size: 11px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.05em; flex: 1; }
-  .col-count { font-size: 11px; color: #999; }
+  .col-title { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; flex: 1; }
+  .col-count { font-size: 11px; color: #64748b; }
   .task-list { min-height: 48px; }
-  .task { background: #fff; border: 0.5px solid #e5e2db; border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; cursor: grab; display: flex; align-items: flex-start; gap: 8px; user-select: none; transition: box-shadow 0.15s, opacity 0.15s; }
-  .task:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .task { background: #1a1a1a; border: 0.5px solid #334155; border-radius: 8px; padding: 8px 10px; margin-bottom: 7px; cursor: grab; display: flex; align-items: flex-start; gap: 8px; user-select: none; transition: box-shadow 0.15s, opacity 0.15s; }
+  .task:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
   .task:active { cursor: grabbing; }
   .task.dragging { opacity: 0.3; }
   .check { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid #ccc; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; }
   .check:hover { border-color: #4caf50; }
   .check svg { display: none; width: 8px; height: 8px; }
   .task-body { flex: 1; min-width: 0; }
-  .task-text { font-size: 12px; line-height: 1.4; word-break: break-word; }
+  .task-text { font-size: 12px; line-height: 1.4; word-break: break-word; color: #e2e8f0; }
   .task-meta { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; align-items: center; }
   .cat-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
   .priority-pill { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; cursor: pointer; }
@@ -191,33 +191,33 @@ onAuthStateChanged(auth, (user) => {
   .task-link { display: inline-flex; align-items: center; margin-left: 4px; color: #6366f1; opacity: 0.7; flex-shrink: 0; }
   .task-link:hover { opacity: 1; }
   .task-link svg { width: 11px; height: 11px; }
-  .drop-hint { font-size: 11px; color: #bbb; text-align: center; padding: 14px 6px; border: 1px dashed #ddd; border-radius: 8px; }
+  .drop-hint { font-size: 11px; color: #475569; text-align: center; padding: 14px 6px; border: 1px dashed #334155; border-radius: 8px; }
   .task-insert-line { height: 3px; background: #6366f1; border-radius: 2px; margin: 2px 0; }
-  .task-date { font-size: 9px; color: #bbb; margin-top: 2px; }
-  .assignee-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; background: #f1f5f9; color: #475569; white-space: nowrap; }
-  .person-panel { display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.5px solid #e0ddd6; }
+  .task-date { font-size: 9px; color: #64748b; margin-top: 2px; }
+  .assignee-badge { font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px; background: #1a1a1a; color: #94a3b8; white-space: nowrap; border: 0.5px solid #334155; }
+  .person-panel { display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.5px solid #334155; }
   .person-panel.open { display: block; }
   .person-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 8px; }
-  .person-panel-header select { padding: 5px 9px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 12px; background: #fff; }
+  .person-panel-header select { padding: 5px 9px; border: 0.5px solid #334155; border-radius: 8px; font-size: 12px; background: #111111; color: #e2e8f0; }
   .person-grid { display: flex; gap: 10px; flex-wrap: wrap; }
-  .person-card { background: #f4f3ee; border-radius: 10px; padding: 0.6rem 1rem; min-width: 80px; text-align: center; }
-  .person-card-name { font-size: 11px; font-weight: 600; color: #555; margin-bottom: 4px; }
-  .person-card-num { font-size: 22px; font-weight: 700; color: #6366f1; }
-  .person-card-label { font-size: 9px; color: #aaa; margin-top: 1px; }
+  .person-card { background: #111111; border-radius: 10px; padding: 0.6rem 1rem; min-width: 80px; text-align: center; border: 0.5px solid #334155; }
+  .person-card-name { font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 4px; }
+  .person-card-num { font-size: 22px; font-weight: 700; color: #818cf8; }
+  .person-card-label { font-size: 9px; color: #64748b; margin-top: 1px; }
   .mid-section { background: transparent; border-radius: 0; border: none; padding: 0; margin-bottom: 1.5rem; }
   .mid-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  .verse-box { flex: 1; min-width: 200px; font-size: 13px; color: #9ca3af; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #e0ddd6; }
-  .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #ddd; background: #f4f3ee; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-  .manage-cats-btn:hover { background: #eae8e1; }
+  .verse-box { flex: 1; min-width: 200px; font-size: 13px; color: #64748b; font-style: italic; line-height: 1.5; padding-left: 12px; border-left: 2px solid #334155; }
+  .manage-cats-btn { padding: 6px 14px; border-radius: 8px; border: 0.5px solid #334155; background: #1a1a1a; color: #94a3b8; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+  .manage-cats-btn:hover { background: #334155; }
   .stats { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
-  .stat { background: #f4f3ee; border-radius: 10px; padding: 0.5rem 0.9rem; min-width: 65px; }
-  .stat-num { font-size: 20px; font-weight: 600; }
-  .stat-label { font-size: 10px; color: #888; margin-top: 1px; }
-  .cat-panel { display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.5px solid #e0ddd6; }
+  .stat { background: #111111; border-radius: 10px; padding: 0.5rem 0.9rem; min-width: 65px; border: 0.5px solid #1e293b; }
+  .stat-num { font-size: 20px; font-weight: 600; color: #e2e8f0; }
+  .stat-label { font-size: 10px; color: #64748b; margin-top: 1px; }
+  .cat-panel { display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 0.5px solid #334155; }
   .cat-panel.open { display: block; }
   .cat-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .cat-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; border: 0.5px solid #e0ddd6; background: #fafaf8; font-size: 12px; font-weight: 500; }
-  .cat-chip.archived-chip { opacity: 0.5; background: #f0ede6; border-style: dashed; }
+  .cat-chip { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; border: 0.5px solid #334155; background: #1a1a1a; font-size: 12px; font-weight: 500; color: #cbd5e1; }
+  .cat-chip.archived-chip { opacity: 0.4; background: #111111; border-style: dashed; }
   .cat-chip .chip-count { font-size: 10px; color: #aaa; }
   .cat-chip .chip-edit { cursor: pointer; color: #ccc; font-size: 11px; border: none; background: none; padding: 0 2px; }
   .cat-chip .chip-edit:hover { color: #6366f1; }
@@ -226,14 +226,14 @@ onAuthStateChanged(auth, (user) => {
   .cat-chip .chip-del { cursor: pointer; color: #ccc; font-size: 15px; line-height: 1; border: none; background: none; padding: 0; }
   .cat-chip .chip-del:hover { color: #e53e3e; }
   .task-search-wrap { position: relative; display: flex; align-items: center; }
-  .task-search { padding: 6px 12px 6px 42px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; background: #fff; width: 180px; }
-  .task-search-icon { position: absolute; left: 8px; color: #bbb; font-size: 11px; pointer-events: none; }
-  .done-search { padding: 5px 10px 5px 28px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 12px; background: #fff; flex: 1; max-width: 200px; }
+  .task-search { padding: 6px 12px 6px 42px; border: 0.5px solid #334155; border-radius: 8px; font-size: 13px; background: #111111; color: #e2e8f0; width: 180px; }
+  .task-search-icon { position: absolute; left: 8px; color: #475569; font-size: 11px; pointer-events: none; }
+  .done-search { padding: 5px 10px 5px 28px; border: 0.5px solid #334155; border-radius: 8px; font-size: 12px; background: #111111; color: #e2e8f0; flex: 1; max-width: 200px; }
   .done-search-wrap { position: relative; display: flex; align-items: center; }
-  .done-search-icon { position: absolute; left: 8px; color: #bbb; font-size: 11px; pointer-events: none; }
+  .done-search-icon { position: absolute; left: 8px; color: #475569; font-size: 11px; pointer-events: none; }
   .add-cat-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .add-cat-row input[type="text"] { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
-  .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #1a1a1a; color: #fff; font-size: 13px; cursor: pointer; }
+  .add-cat-row input[type="text"] { flex: 1; min-width: 130px; padding: 6px 10px; border: 0.5px solid #334155; border-radius: 8px; font-size: 13px; background: #111111; color: #e2e8f0; }
+  .add-cat-row button { padding: 6px 13px; border-radius: 8px; border: none; background: #6366f1; color: #fff; font-size: 13px; cursor: pointer; }
   .bottom-section-title { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
   .bottom-section { display: grid; grid-template-columns: 280px 1fr 1fr; gap: 16px; align-items: stretch; }
   @media (max-width: 900px) { .bottom-section { grid-template-columns: 1fr 1fr; } }
@@ -244,9 +244,9 @@ onAuthStateChanged(auth, (user) => {
     body { padding: 0.75rem; }
     .top-bar { gap: 6px; }
     .top-bar h1 { font-size: 16px; padding: 8px 4px; }
-    .top-bar h1:active { background: #eae8e1; border-radius: 8px; }
-    .top-bar input[type="text"] { min-width: 120px; font-size: 16px; padding: 9px 10px; }
-    .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; }
+    .top-bar h1:active { background: #1a1a1a; border-radius: 8px; }
+    .top-bar input[type="text"] { min-width: 120px; font-size: 16px; padding: 9px 10px; background: #111111; color: #e2e8f0; }
+    .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; background: #1e1b4b; color: #c4b5fd; }
     .top-bar button { min-height: 40px; font-size: 13px; padding: 9px 12px; }
     .priority-btn { min-height: 40px; font-size: 12px; padding: 9px 10px; }
     /* Full width single column on mobile */
@@ -254,8 +254,8 @@ onAuthStateChanged(auth, (user) => {
     .col { min-width: 100%; width: 100%; margin-bottom: 0; }
     .col.mobile-hidden { display: none; }
     #mobile-col-picker { display: block !important; }
-    .mobile-tab { padding: 8px 14px; border-radius: 20px; border: 1.5px solid #e0ddd6; background: #fff; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 5px; }
-    .mobile-tab.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+    .mobile-tab { padding: 8px 14px; border-radius: 20px; border: 1.5px solid #334155; background: #1a1a1a; color: #94a3b8; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; min-height: 40px; display: flex; align-items: center; gap: 5px; }
+    .mobile-tab.active { background: #6366f1; color: #fff; border-color: #6366f1; }
     .mobile-tab.has-search-match { border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
     .mobile-tab.has-search-match::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #6366f1; display: inline-block; margin-left: 4px; }
     .task { padding: 12px 10px; }
@@ -265,53 +265,53 @@ onAuthStateChanged(auth, (user) => {
     .cat-badge { font-size: 11px; padding: 3px 8px; }
     .assignee-badge { font-size: 11px; padding: 3px 8px; }
     .mid-row { flex-direction: column; align-items: flex-start; gap: 10px; }
-    .verse-box { min-width: unset; width: 100%; border-left: none; border-top: 2px solid #e0ddd6; padding-left: 0; padding-top: 10px; font-size: 12px; }
+    .verse-box { min-width: unset; width: 100%; border-left: none; border-top: 2px solid #334155; padding-left: 0; padding-top: 10px; font-size: 12px; }
     .stats { gap: 6px; }
     .stat { padding: 0.5rem 0.7rem; min-width: 55px; }
     .stat-num { font-size: 18px; }
   }
-  .bottom-card { background: #fff; border-radius: 12px; border: 0.5px solid #e0ddd6; padding: 1.25rem; display: flex; flex-direction: column; }
-  .bottom-card h3 { font-size: 12px; font-weight: 600; color: #555; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .bottom-card { background: #111111; border-radius: 12px; border: 0.5px solid #1e293b; padding: 1.25rem; display: flex; flex-direction: column; }
+  .bottom-card h3 { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.04em; }
   .done-task-list { max-height: 320px; overflow-y: auto; flex: 1; }
-  .done-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #f0ede6; }
+  .done-item { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #1e293b; }
   .done-item:last-child { border-bottom: none; }
   .done-uncheck { width: 15px; height: 15px; border-radius: 50%; background: #4caf50; border: none; flex-shrink: 0; margin-top: 2px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
   .done-uncheck svg { width: 7px; height: 7px; }
-  .done-text { font-size: 12px; color: #aaa; text-decoration: line-through; flex: 1; line-height: 1.4; }
+  .done-text { font-size: 12px; color: #475569; text-decoration: line-through; flex: 1; line-height: 1.4; }
   .chart-wrap { position: relative; flex: 1; min-height: 200px; overflow-x: auto; }
   .chart-inner { min-width: 900px; height: 100%; min-height: 220px; position: relative; }
   .log-list { max-height: 280px; overflow-y: auto; flex: 1; }
-  .log-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #f0ede6; }
+  .log-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #1e293b; }
   .log-item:last-child { border-bottom: none; }
-  .log-text { font-size: 12px; color: #888; text-decoration: line-through; flex: 1; line-height: 1.4; }
+  .log-text { font-size: 12px; color: #475569; text-decoration: line-through; flex: 1; line-height: 1.4; }
   .log-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
-  .log-date { color: #bbb; font-size: 11px; white-space: nowrap; }
-  .empty-state { font-size: 13px; color: #bbb; text-align: center; padding: 1.5rem 0; }
+  .log-date { color: #475569; font-size: 11px; white-space: nowrap; }
+  .empty-state { font-size: 13px; color: #475569; text-align: center; padding: 1.5rem 0; }
   .clear-done-btn { font-size: 11px; color: #e53e3e; border: none; background: none; cursor: pointer; padding: 0; float: right; }
   .clear-done-btn:hover { text-decoration: underline; }
-  .ctx-menu { position: fixed; z-index: 200; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 0.5px solid #e0ddd6; padding: 6px; min-width: 200px; display: none; }
+  .ctx-menu { position: fixed; z-index: 200; background: #1a1a1a; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); border: 0.5px solid #334155; padding: 6px; min-width: 200px; display: none; }
   .ctx-menu.open { display: block; }
-  .ctx-title { font-size: 11px; font-weight: 600; color: #aaa; padding: 4px 10px 6px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid #f0ede6; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-  .ctx-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; color: #1a1a1a; }
-  .ctx-item:hover { background: #f4f3ee; }
-  .ctx-item.danger { color: #e53e3e; }
+  .ctx-title { font-size: 11px; font-weight: 600; color: #64748b; padding: 4px 10px 6px; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid #334155; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .ctx-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; cursor: pointer; color: #e2e8f0; }
+  .ctx-item:hover { background: #334155; }
+  .ctx-item.danger { color: #f87171; }
   .ctx-item .ctx-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
-  .ctx-divider { height: 0.5px; background: #f0ede6; margin: 4px 0; }
+  .ctx-divider { height: 0.5px; background: #334155; margin: 4px 0; }
   .ctx-submenu-wrap { position: relative; }
-  .ctx-submenu { position: fixed; z-index: 201; background: #fff; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 0.5px solid #e0ddd6; padding: 6px; min-width: 180px; display: none; max-height: 300px; overflow-y: auto; }
+  .ctx-submenu { position: fixed; z-index: 201; background: #1a1a1a; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.5); border: 0.5px solid #334155; padding: 6px; min-width: 180px; display: none; max-height: 300px; overflow-y: auto; }
   .ctx-submenu.open { display: block; }
   .ctx-overlay { display: none; position: fixed; inset: 0; z-index: 199; }
   .ctx-overlay.open { display: block; }
-  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
   .modal-overlay.open { display: flex; }
-  .modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; }
-  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; }
-  .modal label { font-size: 12px; color: #666; display: block; margin-bottom: 4px; margin-top: 10px; }
-  .modal input, .modal select { width: 100%; padding: 8px 10px; border: 0.5px solid #ddd; border-radius: 8px; font-size: 13px; }
+  .modal { background: #1a1a1a; border-radius: 14px; padding: 1.5rem; width: 380px; max-width: 92vw; border: 0.5px solid #334155; }
+  .modal h2 { font-size: 15px; font-weight: 600; margin-bottom: 1rem; color: #e2e8f0; }
+  .modal label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 4px; margin-top: 10px; }
+  .modal input, .modal select { width: 100%; padding: 8px 10px; border: 0.5px solid #334155; border-radius: 8px; font-size: 13px; background: #111111; color: #e2e8f0; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 1rem; }
-  .modal-actions button { padding: 7px 16px; border-radius: 8px; border: 0.5px solid #ddd; font-size: 13px; cursor: pointer; background: #fff; }
-  .modal-actions button.confirm { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-  .modal-actions button.danger { color: #e53e3e; }
+  .modal-actions button { padding: 7px 16px; border-radius: 8px; border: 0.5px solid #334155; font-size: 13px; cursor: pointer; background: #1a1a1a; color: #e2e8f0; }
+  .modal-actions button.confirm { background: #6366f1; color: #fff; border-color: #6366f1; }
+  .modal-actions button.danger { color: #f87171; }
   .edit-priority-btns { display: flex; gap: 8px; margin-top: 4px; }
   .edit-priority-btns .priority-btn { flex: 1; padding: 8px; font-size: 12px; }
 
@@ -321,8 +321,8 @@ onAuthStateChanged(auth, (user) => {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #f8f4ff;
-  border-bottom: 1px solid #e2d9f3;
+  background: #1e1b4b;
+  border-bottom: 1px solid #312e81;
   flex-wrap: wrap;
   position: relative;
 }
@@ -331,10 +331,11 @@ onAuthStateChanged(auth, (user) => {
   flex: 1;
   min-width: 280px;
   padding: 7px 12px;
-  border: 1.5px solid #c4b5e8;
+  border: 1.5px solid #4338ca;
   border-radius: 8px;
   font-size: 14px;
-  background: #fff;
+  background: #111111;
+  color: #e2e8f0;
   outline: none;
 }
 .ai-task-bar input[type="text"]:focus { border-color: #8b5cf6; }
@@ -393,7 +394,7 @@ onAuthStateChanged(auth, (user) => {
 .ai-thread-tools button:hover { background: #ede9fe; }
 .ai-msg { padding: 6px 10px; border-radius: 8px; max-width: 92%; word-wrap: break-word; white-space: pre-wrap; }
 .ai-msg.user { align-self: flex-end; background: #ede9fe; color: #3b1a78; border: 0.5px solid #c4b5e8; }
-.ai-msg.assistant { align-self: flex-start; background: #f4f3ee; color: #1a1a1a; border: 0.5px solid #e0ddd6; }
+.ai-msg.assistant { align-self: flex-start; background: #1a1a1a; color: #e2e8f0; border: 0.5px solid #334155; }
 .ai-msg.assistant.mutation { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
 .ai-msg.assistant.error { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
 .ai-msg.assistant.thinking { background: #f5f3ff; border-color: #e2d9f3; color: #6d28d9; font-style: italic; }
@@ -438,8 +439,8 @@ onAuthStateChanged(auth, (user) => {
 .ai-hist-kind.mutation { background: #f0fdf4; color: #166534; }
 .ai-hist-kind.answer { background: #eff6ff; color: #1e40af; }
 .ai-hist-kind.error { background: #fef2f2; color: #991b1b; }
-.ai-hist-q { font-size: 13px; color: #1a1a1a; line-height: 1.4; }
-.ai-hist-a { font-size: 12px; color: #555; line-height: 1.5; padding-left: 14px; border-left: 2px solid #e2d9f3; margin-top: 2px; white-space: pre-wrap; }
+.ai-hist-q { font-size: 13px; color: #cbd5e1; line-height: 1.4; }
+.ai-hist-a { font-size: 12px; color: #64748b; line-height: 1.5; padding-left: 14px; border-left: 2px solid #4338ca; margin-top: 2px; white-space: pre-wrap; }
 .ai-hist-del {
   position: absolute;
   top: 8px;
@@ -460,14 +461,14 @@ onAuthStateChanged(auth, (user) => {
 <body>
 
 <!-- PASSWORD GATE -->
-<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#f4f3ee;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:20px;box-sizing:border-box">
-  <div style="background:#fff;border-radius:16px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;gap:14px;box-sizing:border-box">
+<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:20px;box-sizing:border-box">
+  <div style="background:#1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.4);display:flex;flex-direction:column;align-items:center;gap:14px;box-sizing:border-box;border:0.5px solid #334155;">
     <div style="font-size:40px;line-height:1">📋</div>
-    <div style="font-size:22px;font-weight:700;color:#1a1a1a;text-align:center">Philinity's Task Board</div>
-    <div style="font-size:13px;color:#888;text-align:center">Sign in to continue</div>
-    <button onclick="googleSignIn()" style="background:#1a1a1a;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
-    <div id="pw-error" style="color:#e53e3e;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#bbb;text-align:center">Stays logged in for 30 days · Version 6.2</div>
+    <div style="font-size:22px;font-weight:700;color:#e2e8f0;text-align:center">Philinity's Task Board</div>
+    <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
+    <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
+    <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.5</div>
   </div>
 </div>
 
@@ -492,7 +493,7 @@ onAuthStateChanged(auth, (user) => {
     <option value="added">Date added</option>
   </select>
   <input type="text" class="task-search" id="task-search-input" placeholder="🔍 Search tasks..." oninput="applyTaskSearch()" onkeydown="if(event.key==='Enter')applyTaskSearch()" enterkeyhint="search" style="padding:7px 12px;">
-  <button onclick="applyTaskSearch()" title="Search" style="padding:7px 14px;border-radius:8px;border:0.5px solid #ddd;background:#fff;font-size:14px;cursor:pointer;font-weight:500;white-space:nowrap;">🔍</button>
+  <button onclick="applyTaskSearch()" title="Search" style="padding:7px 14px;border-radius:8px;border:0.5px solid #334155;background:#1e293b;color:#e2e8f0;font-size:14px;cursor:pointer;font-weight:500;white-space:nowrap;">🔍</button>
   <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
 </div>
 
@@ -544,16 +545,16 @@ onAuthStateChanged(auth, (user) => {
     </div>
     <div class="person-panel" id="person-panel">
       <div class="person-panel-header">
-        <span style="font-size:12px;font-weight:600;color:#555;">Tasks per person</span>
+        <span style="font-size:12px;font-weight:600;color:#94a3b8;">Tasks per person</span>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <select id="person-month-select" onchange="renderPersonStats()"></select>
-          <button onclick="toggleManagePeople()" id="manage-people-btn" style="padding:4px 10px;border-radius:8px;border:0.5px solid #ddd;background:#f4f3ee;font-size:12px;cursor:pointer;">+ Add Person</button>
+          <button onclick="toggleManagePeople()" id="manage-people-btn" style="padding:4px 10px;border-radius:8px;border:0.5px solid #334155;background:#1e293b;color:#94a3b8;font-size:12px;cursor:pointer;">+ Add Person</button>
         </div>
       </div>
       <div id="manage-people-row" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-        <input type="text" id="new-person-name" placeholder="Name..." maxlength="20" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:13px;width:140px;" />
-        <button onclick="addPerson()" style="padding:5px 12px;border-radius:8px;border:none;background:#1a1a1a;color:#fff;font-size:13px;cursor:pointer;">Add</button>
-        <span style="font-size:11px;color:#aaa;">Current: </span>
+        <input type="text" id="new-person-name" placeholder="Name..." maxlength="20" style="padding:5px 9px;border:0.5px solid #334155;border-radius:8px;font-size:13px;width:140px;background:#0f172a;color:#e2e8f0;" />
+        <button onclick="addPerson()" style="padding:5px 12px;border-radius:8px;border:none;background:#6366f1;color:#fff;font-size:13px;cursor:pointer;">Add</button>
+        <span style="font-size:11px;color:#475569;">Current: </span>
         <div id="people-chips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
         <button onclick="migrateAustinToAusten()" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fcd34d;background:#fefce8;color:#92400e;font-size:11px;cursor:pointer;">🔧 Fix Austin→Austen</button>
       </div>
@@ -565,7 +566,7 @@ onAuthStateChanged(auth, (user) => {
     </div>
     <div class="cat-panel" id="cat-panel">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
-        <label style="font-size:12px;color:#888;display:flex;align-items:center;gap:5px;cursor:pointer;">
+        <label style="font-size:12px;color:#64748b;display:flex;align-items:center;gap:5px;cursor:pointer;">
           <input type="checkbox" id="show-archived-toggle" onchange="renderCatList()" style="cursor:pointer;">
           Show archived categories
         </label>
@@ -573,20 +574,20 @@ onAuthStateChanged(auth, (user) => {
       <div class="cat-list" id="cat-list"></div>
       <div class="add-cat-row">
         <input type="text" id="new-cat-name" placeholder="Category name..." maxlength="30" onkeydown="if(event.key==='Enter')addCategory()" />
-        <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #ddd;border-radius:8px;background:#fff;" />
+        <input type="text" id="new-cat-icon" value="📁" maxlength="2" placeholder="📁" style="width:48px;text-align:center;font-size:18px;padding:4px 2px;border:0.5px solid #334155;border-radius:8px;background:#0f172a;" />
         <button onclick="addCategory()">+ Add Category</button>
       </div>
     </div>
   </div>
 </div>
 <!-- BOTTOM -->
-<div class="bottom-section-title" onclick="toggleHistoryPanel()" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;user-select:none;" title="Click to expand/collapse">
+<div class="bottom-section-title" onclick="toggleHistoryPanel()" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;user-select:none;color:#94a3b8;" title="Click to expand/collapse">
   📊 Completion History
-  <span id="history-arrow" style="font-size:12px;color:#888;">▾</span>
+  <span id="history-arrow" style="font-size:12px;color:#475569;">▾</span>
   <div class="done-search-wrap" id="done-search-wrap" style="display:none;" onclick="event.stopPropagation()">
     <span class="done-search-icon">🔍</span>
     <input type="text" class="done-search" id="done-search-input" placeholder="Search completed..." oninput="renderHistory()" onkeydown="if(event.key==='Enter')renderHistory()" enterkeyhint="search">
-    <button onclick="event.stopPropagation();renderHistory()" title="Search" style="padding:4px 10px;border-radius:6px;border:0.5px solid #ddd;background:#fff;font-size:13px;cursor:pointer;margin-left:4px;">🔍</button>
+    <button onclick="event.stopPropagation();renderHistory()" title="Search" style="padding:4px 10px;border-radius:6px;border:0.5px solid #334155;background:#1e293b;color:#94a3b8;font-size:13px;cursor:pointer;margin-left:4px;">🔍</button>
   </div>
 </div>
 <div class="bottom-section" id="history-panel" style="grid-template-columns: 0.9fr 1fr;display:none;">
@@ -601,30 +602,30 @@ onAuthStateChanged(auth, (user) => {
 </div>
 
 <!-- AI CHAT HISTORY (collapsible, matches Completion History style) -->
-<div class="bottom-section-title" onclick="toggleAIHistoryPanel()" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;user-select:none;margin-top:1rem;" title="Click to expand/collapse">
+<div class="bottom-section-title" onclick="toggleAIHistoryPanel()" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;user-select:none;margin-top:1rem;color:#94a3b8;" title="Click to expand/collapse">
   🤖 AI Chat History
-  <span id="ai-history-arrow" style="font-size:12px;color:#888;">▾</span>
+  <span id="ai-history-arrow" style="font-size:12px;color:#475569;">▾</span>
   <div id="ai-history-controls" style="display:none;align-items:center;gap:8px;flex-wrap:wrap;" onclick="event.stopPropagation()">
     <span style="position:relative;display:flex;align-items:center;">
-      <span style="position:absolute;left:8px;color:#bbb;font-size:11px;pointer-events:none;">🔍</span>
-      <input type="text" id="ai-history-search" placeholder="Search AI history..." oninput="renderAIHistory()" onkeydown="if(event.key==='Enter')renderAIHistory()" enterkeyhint="search" style="padding:5px 10px 5px 28px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;width:180px;">
+      <span style="position:absolute;left:8px;color:#475569;font-size:11px;pointer-events:none;">🔍</span>
+      <input type="text" id="ai-history-search" placeholder="Search AI history..." oninput="renderAIHistory()" onkeydown="if(event.key==='Enter')renderAIHistory()" enterkeyhint="search" style="padding:5px 10px 5px 28px;border:0.5px solid #334155;border-radius:8px;font-size:12px;background:#0f172a;color:#e2e8f0;width:180px;">
     </span>
-    <select id="ai-history-filter" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
+    <select id="ai-history-filter" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #334155;border-radius:8px;font-size:12px;background:#0f172a;color:#e2e8f0;cursor:pointer;">
       <option value="all">All turns</option>
       <option value="mutations">Only mutations</option>
       <option value="questions">Only questions</option>
       <option value="errors">Only errors</option>
     </select>
-    <select id="ai-history-user" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #ddd;border-radius:8px;font-size:12px;background:#fff;cursor:pointer;">
+    <select id="ai-history-user" onchange="renderAIHistory()" style="padding:5px 9px;border:0.5px solid #334155;border-radius:8px;font-size:12px;background:#0f172a;color:#e2e8f0;cursor:pointer;">
       <option value="all">All people</option>
       <option value="CuJigrzCbRfFFsM7uqe0mix46xH3">Phil</option>
       <option value="g4stabGPKiWAE23NTw6oUsqawWf1">Trinity</option>
     </select>
-    <button onclick="clearAIHistoryAll()" title="Delete all AI history" style="padding:5px 10px;border-radius:8px;border:0.5px solid #fca5a5;background:#fef2f2;color:#991b1b;font-size:12px;cursor:pointer;">🗑 Clear All</button>
+    <button onclick="clearAIHistoryAll()" title="Delete all AI history" style="padding:5px 10px;border-radius:8px;border:0.5px solid #7f1d1d;background:#1c0a0a;color:#f87171;font-size:12px;cursor:pointer;">🗑 Clear All</button>
   </div>
 </div>
 <div id="ai-history-panel" style="display:none;margin-top:10px;">
-  <div id="ai-history-stats" style="font-size:11px;color:#888;margin-bottom:8px;"></div>
+  <div id="ai-history-stats" style="font-size:11px;color:#475569;margin-bottom:8px;"></div>
   <div id="ai-history-list" class="log-list" style="max-height:420px;"></div>
 </div>
 <!-- Restore Modal -->
@@ -1036,8 +1037,9 @@ function rebuildCatSelects() {
     const sel = document.getElementById(id);
     if (!sel) return;
     const cur = sel.value;
-    sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.icon} ${escapeHtml(c.label)}</option>`).join('');
-    if (cur && categories.find(c => c.id === cur)) sel.value = cur;
+    const active = categories.filter(c => !c.archived);
+    sel.innerHTML = active.map(c => `<option value="${c.id}">${c.icon} ${escapeHtml(c.label)}</option>`).join('');
+    if (cur && active.find(c => c.id === cur)) sel.value = cur;
   });
 }
 function fmtDate(iso) {
@@ -1312,7 +1314,7 @@ function renderHistory() {
   chartInstance = new Chart(ctx, {
     type: 'bar',
     data: { labels: months.map(m => m.label), datasets: [{ data: months.map(m => m.count), backgroundColor: months.map((_,i) => i === 0 ? '#6366f1' : '#c7d2fe'), borderRadius: 6, borderSkipped: false }] },
-    options: { responsive: false, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} completed` } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } }, grid: { color: '#f0ede6' } }, x: { ticks: { font: { size: 11 } }, grid: { display: false } } } }
+    options: { responsive: false, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.parsed.y} completed` } } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 }, color: '#64748b' }, grid: { color: '#1e293b' } }, x: { ticks: { font: { size: 11 }, color: '#64748b' }, grid: { display: false } } } }
   });
   ctx.canvas.width = 900; ctx.canvas.height = 220; chartInstance.resize();
 }
@@ -1487,7 +1489,7 @@ function importData(event) {
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
       overlay.innerHTML = `
-        <div style="background:#fff;border-radius:14px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.2);">
+        <div style="background:#1e293b;border-radius:14px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155;">
           <div style="font-size:18px;font-weight:700;color:#1a1a1a;margin-bottom:6px;">⬆ Import "${file.name}"</div>
           <div style="font-size:13px;color:#888;margin-bottom:20px;">
             Backup has <strong>${importedTaskCount} tasks</strong> · Your board has <strong>${currentTaskCount} tasks</strong>
@@ -2399,7 +2401,7 @@ function goHome() {
 
 <!-- DATA MODAL -->
 <div id="tb-data-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+  <div style="background:#1e293b;border-radius:16px;width:100%;max-width:500px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155">
     <button onclick="closeDataModal()" style="position:absolute;top:14px;right:14px;background:#f4f3ee;border:1px solid #ddd;color:#666;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button>
     <div style="font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:4px">📦 Data Manager</div>
     <div style="font-size:12px;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Backup · Export · Restore</div>
@@ -2433,6 +2435,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 6.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">Philinity© Rev 6.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#475569">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
