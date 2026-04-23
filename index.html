@@ -117,7 +117,12 @@ onAuthStateChanged(auth, (user) => {
       loadedTasks = loadedTasks.filter(t => t.col !== 'done');
     }
     tasks = loadedTasks;
-    categories = data.categories || JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    const rawCats = data.categories || null;
+    if (rawCats) {
+      categories = Array.isArray(rawCats) ? rawCats : Object.values(rawCats);
+    } else {
+      categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+    }
     taskOrder = data.taskOrder || {};
     nextId = data.nextId || 100;
     nextCatId = data.nextCatId || 50;
@@ -873,7 +878,9 @@ function save() {
   localStorage.setItem('phil-people-v6', JSON.stringify(PEOPLE));
   if (window._fbRef && window._fbSet) {
     window._suppressListener = true;
-    window._fbSet(window._fbRef, { tasks, categories, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE })
+    const categoriesObj = {};
+    categories.forEach(c => { categoriesObj[c.id] = c; });
+    window._fbSet(window._fbRef, { tasks, categories: categoriesObj, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE })
       .then(() => { showSyncNotice('Saved ☁️ ✓'); setTimeout(() => window._suppressListener = false, 1000); })
       .catch(() => showSyncNotice('Saved locally ✓'));
   } else {
@@ -2426,6 +2433,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 6.3 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #bbb;">Philinity© Rev 6.4 · <span onclick="openDataModal()" style="cursor:pointer;color:#aaa">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#aaa">🚪 Sign Out</span></div>
 </body>
 </html>
