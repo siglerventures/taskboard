@@ -242,13 +242,34 @@ onAuthStateChanged(auth, (user) => {
   /* ── MOBILE FRIENDLY ───────────────────── */
   @media (max-width: 600px) {
     body { padding: 0.75rem; }
-    .top-bar { gap: 6px; }
-    .top-bar h1 { font-size: 16px; padding: 8px 4px; }
+
+    /* Row 1: logo only */
+    .top-bar { gap: 6px; flex-wrap: wrap; }
+    .top-bar h1 { font-size: 16px; padding: 8px 4px; width: 100%; }
     .top-bar h1:active { background: #1a1a1a; border-radius: 8px; }
-    .top-bar input[type="text"] { min-width: 120px; font-size: 16px; padding: 9px 10px; background: #111111; color: #e2e8f0; }
-    .top-bar select { font-size: 14px; padding: 9px 8px; min-height: 40px; background: #1e1b4b; color: #c4b5fd; }
-    .top-bar button { min-height: 40px; font-size: 13px; padding: 9px 12px; }
+
+    /* Row 2: new task input full width */
+    .top-bar input[type="text"]#new-task-text { width: 100%; flex: none; min-width: unset; font-size: 16px; padding: 9px 10px; background: #111111; color: #e2e8f0; order: 2; }
+
+    /* Row 3: category select + priority + add button */
+    .top-bar select#new-task-cat { order: 3; font-size: 14px; padding: 9px 8px; min-height: 40px; background: #1e1b4b; color: #c4b5fd; flex: 1; }
+    .priority-btns { order: 4; }
+    .top-bar button.primary { order: 5; min-height: 40px; font-size: 13px; padding: 9px 12px; }
     .priority-btn { min-height: 40px; font-size: 12px; padding: 9px 10px; }
+
+    /* Hide sort label + sort select on mobile */
+    .sort-label { display: none; }
+    .top-bar select#sort-select { display: none; }
+
+    /* Hide search on mobile top bar */
+    .task-search { display: none; }
+    .top-bar button[onclick="applyTaskSearch()"] { display: none; }
+
+    /* AI bar - Ask button inline on right */
+    .ai-task-bar { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+    .ai-task-bar input[type="text"] { min-width: unset; flex: 1; font-size: 14px; }
+    .ai-ask-btn { flex-shrink: 0; padding: 7px 14px; font-size: 14px; }
+
     /* Full width single column on mobile */
     .columns-wrap { flex-direction: column; overflow-x: visible; gap: 0; }
     .col { min-width: 100%; width: 100%; margin-bottom: 0; }
