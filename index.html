@@ -10,7 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -23,28 +23,63 @@ const firebaseConfig = {
   appId: "1:443020781676:web:614ec91c9ba33076eb9049"
 };
 
-const ALLOWED_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
+// Both root UIDs are always-admin and lockout-proof. Kept identical to the
+// shared access model in autoflag-installs (Phil + Trinity).
+const ROOT_ADMIN_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
+const VALID_ROLES = ['admin', 'moderator', 'user'];
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const auth = getAuth(app);
 
-// Expose sign-in function to the non-module script
+// Email → RTDB key. MUST match the security-rules transform and AutoFlag's
+// emailToKey exactly (lowercase + global replace of chars RTDB keys reject).
+function emailToKey(email) {
+  if (!email) return '';
+  return email
+    .toLowerCase()
+    .trim()
+    .replace(/\./g, '_')
+    .replace(/#/g, '_HASH_')
+    .replace(/\$/g, '_DOL_')
+    .replace(/\[/g, '_OB_')
+    .replace(/\]/g, '_CB_')
+    .replace(/\//g, '_FS_');
+}
+window.emailToKey = emailToKey;
+
+// Resolved access for the signed-in user (read by the non-module script).
+window.TB_ROLE = null;     // 'admin' | 'moderator' | 'user'
+window.TB_PERSON = null;   // mapped assignee name (only meaningful for 'user')
+window.TB_EMAIL = null;
+
+// Resolve a user's role: root UID → admin; else taskboard/access/{emailKey}.
+async function resolveAccess(user) {
+  if (ROOT_ADMIN_UIDS.includes(user.uid)) return { role: 'admin', person: null };
+  try {
+    const key = emailToKey(user.email || '');
+    if (!key) return null;
+    const snap = await get(ref(db, 'taskboard/access/' + key));
+    const rec = snap.val();
+    if (rec && VALID_ROLES.includes(rec.role)) {
+      return { role: rec.role, person: rec.person || null };
+    }
+  } catch (e) {
+    console.error('Access resolution failed:', e);
+  }
+  return null;
+}
+
+// Expose sign-in. Authorization itself happens in onAuthStateChanged so the
+// popup and any cached 30-day session go through the same roster gate.
 window.googleSignIn = async function() {
   try {
     const provider = new GoogleAuthProvider();
-    const result = await signInWithPopup(auth, provider);
-    if (!ALLOWED_UIDS.includes(result.user.uid)) {
-      await signOut(auth);
-      document.getElementById('pw-error').style.display = 'block';
-      document.getElementById('pw-error').textContent = 'This Google account is not authorized.';
-      return;
-    }
-    // Success — auth-gate will be hidden by onAuthStateChanged below
+    await signInWithPopup(auth, provider);
   } catch(e) {
     console.error('Sign-in failed:', e);
-    document.getElementById('pw-error').style.display = 'block';
-    document.getElementById('pw-error').textContent = 'Sign-in failed. Please try again.';
+    const err = document.getElementById('pw-error');
+    if (err) { err.style.display = 'block'; err.textContent = 'Sign-in failed. Please try again.'; }
   }
 };
 
@@ -57,6 +92,7 @@ const dataRef = ref(db, 'taskboard');
 window._fbRef = dataRef;
 window._fbSet = set;
 window._fbGet = get;
+window._fbUpdate = update;
 window._fbRefFn = ref;
 window._fbOnValue = onValue;
 window._fbDb = db;
@@ -65,84 +101,102 @@ window._fbAuth = auth;
 
 window._firebaseDataLoaded = false;
 
-// onAuthStateChanged fires whenever sign-in state changes
-onAuthStateChanged(auth, (user) => {
+// Shared task data lives in per-leaf nodes under `taskboard` rather than a
+// single wholesale node. This lets the security rules grant roster members
+// read on the task data while keeping taskboard/access admin-only (a granted
+// read on a parent can never be revoked on a child, so we never read the
+// parent). We listen per leaf and rebuild from a small cache.
+const TB_DATA_LEAVES = ['tasks', 'categories', 'completionLog', 'taskOrder', 'nextId', 'nextCatId', 'people'];
+window._fbCache = {};
+let _tbLeavesAttached = false;
+let _tbErrShown = false;
+let _tbRebuildTimer = null;
+
+function _tbScheduleRebuild() {
+  if (_tbRebuildTimer) return;
+  _tbRebuildTimer = setTimeout(() => { _tbRebuildTimer = null; _tbRebuildFromCache(); }, 40);
+}
+
+function _tbRebuildFromCache() {
+  if (window._suppressListener) return;
+  const data = window._fbCache;
+  window._firebaseDataLoaded = true;
+  // tasks is stored as a keyed map (taskboard/tasks/{id}); normalize to array.
+  let loadedTasks = data.tasks ? Object.values(data.tasks).filter(Boolean) : JSON.parse(JSON.stringify(DEFAULT_TASKS));
+  completionLog = data.completionLog || [];
+  const doneTasks = loadedTasks.filter(t => t && t.col === 'done');
+  if (doneTasks.length > 0) {
+    const existingKeys = new Set(completionLog.map(l => l.text + '|' + (l.completedAt||'')));
+    doneTasks.forEach(t => {
+      const key = t.text + '|' + (t.completedAt||'');
+      if (!existingKeys.has(key)) {
+        completionLog.unshift({ id: t.id, text: t.text, cat: t.cat, assignee: t.assignee, completedAt: t.completedAt || new Date().toISOString(), dateAdded: t.dateAdded, priority: t.priority || 'medium' });
+      }
+    });
+    loadedTasks = loadedTasks.filter(t => t && t.col !== 'done');
+  }
+  tasks = loadedTasks;
+  const rawCats = data.categories || null;
+  categories = rawCats ? (Array.isArray(rawCats) ? rawCats : Object.values(rawCats)) : JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
+  taskOrder = data.taskOrder || {};
+  nextId = data.nextId || 100;
+  nextCatId = data.nextCatId || 50;
+  if (data.people) PEOPLE = data.people;
+  rebuildCatSelects();
+  renderAll();
+  renderHistory();
+  showSyncNotice('Synced ☁️');
+}
+
+function _tbAttachLeafListeners() {
+  if (_tbLeavesAttached) return;
+  _tbLeavesAttached = true;
+  TB_DATA_LEAVES.forEach(k => {
+    onValue(ref(db, 'taskboard/' + k), (snap) => {
+      window._fbCache[k] = snap.val();
+      _tbScheduleRebuild();
+    }, (error) => {
+      console.error('Task Board listener failed (' + k + '):', error);
+      if (!window._firebaseDataLoaded && !_tbErrShown) {
+        _tbErrShown = true;
+        load(); rebuildCatSelects(); renderAll(); renderHistory();
+        showSyncNotice('⚠️ Offline mode — using local cache');
+      } else if (!_tbErrShown) {
+        _tbErrShown = true;
+        showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
+      }
+    });
+  });
+}
+
+// onAuthStateChanged fires whenever sign-in state changes.
+onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    // Not signed in — show gate
     document.getElementById('auth-gate').style.display = 'flex';
     document.body.style.overflow = 'hidden';
     return;
   }
-  // Signed in — verify UID
-  if (!ALLOWED_UIDS.includes(user.uid)) {
-    signOut(auth);
+  // Resolve role from root UID or the taskboard/access roster.
+  const access = await resolveAccess(user);
+  if (!access) {
+    const err = document.getElementById('pw-error');
+    if (err) { err.style.display = 'block'; err.textContent = 'This Google account is not authorized.'; }
+    await signOut(auth);
     return;
   }
-  // Authorized — hide gate, load data
+  window.TB_ROLE = access.role;
+  window.TB_PERSON = access.person;
+  window.TB_EMAIL = user.email || '';
+  if (typeof applyRoleToUI === 'function') applyRoleToUI();
+
+  // Authorized — hide gate, load data.
   document.getElementById('auth-gate').style.display = 'none';
   document.body.style.overflow = '';
 
-  // Load this user's mobile category preferences
   if (typeof loadUserMobilePrefs === 'function') loadUserMobilePrefs();
-  // Load shared AI chat history
   if (typeof loadAIHistory === 'function') loadAIHistory();
-  
-  onValue(dataRef, (snapshot) => {
-    const data = snapshot.val();
-    if (!data) {
-      if (window._firebaseDataLoaded) return;
-      window._firebaseDataLoaded = true;
-      tasks = JSON.parse(JSON.stringify(DEFAULT_TASKS));
-      categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-      completionLog = [];
-      taskOrder = {};
-      nextId = 100;
-      nextCatId = 50;
-      rebuildCatSelects(); renderAll(); renderHistory();
-      return;
-    }
-    if (window._suppressListener) return;
-    window._firebaseDataLoaded = true;
-    let loadedTasks = data.tasks || JSON.parse(JSON.stringify(DEFAULT_TASKS));
-    completionLog = data.completionLog || [];
-    const doneTasks = loadedTasks.filter(t => t.col === 'done');
-    if (doneTasks.length > 0) {
-      const existingKeys = new Set(completionLog.map(l => l.text + '|' + (l.completedAt||'')));
-      doneTasks.forEach(t => {
-        const key = t.text + '|' + (t.completedAt||'');
-        if (!existingKeys.has(key)) {
-          completionLog.unshift({ id: t.id, text: t.text, cat: t.cat, assignee: t.assignee, completedAt: t.completedAt || new Date().toISOString(), dateAdded: t.dateAdded, priority: t.priority || 'medium' });
-        }
-      });
-      loadedTasks = loadedTasks.filter(t => t.col !== 'done');
-    }
-    tasks = loadedTasks;
-    const rawCats = data.categories || null;
-    if (rawCats) {
-      categories = Array.isArray(rawCats) ? rawCats : Object.values(rawCats);
-    } else {
-      categories = JSON.parse(JSON.stringify(DEFAULT_CATEGORIES));
-    }
-    taskOrder = data.taskOrder || {};
-    nextId = data.nextId || 100;
-    nextCatId = data.nextCatId || 50;
-    if (data.people) PEOPLE = data.people;
-    rebuildCatSelects();
-    renderAll();
-    renderHistory();
-    showSyncNotice('Synced ☁️');
-  }, (error) => {
-    console.error('Task Board Firebase listener failed:', error);
-    if (!window._firebaseDataLoaded) {
-      load();
-      rebuildCatSelects();
-      renderAll();
-      renderHistory();
-      showSyncNotice('⚠️ Offline mode — using local cache');
-    } else {
-      showSyncNotice('⚠️ ' + (error.code || error.message || 'Sync failed'));
-    }
-  });
+
+  _tbAttachLeafListeners();
 });
 </script>
 <style>
@@ -490,7 +544,7 @@ onAuthStateChanged(auth, (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.5</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.6</div>
   </div>
 </div>
 
@@ -848,6 +902,36 @@ window.addEventListener('resize', () => { if (typeof renderAll === 'function') r
 let newTaskPriority = 'medium', editTaskPriority = 'medium';
 let catPanelOpen = false, personPanelOpen = false;
 let PEOPLE = ['Phil', 'Trinity', 'Austen'];
+// Best-effort record of task ids last written to the DB, so save() can null
+// out tasks removed during the brief window before the listener echo lands.
+let _tbWrittenTaskKeys = new Set();
+
+// ── ROLE-BASED VISIBILITY ─────────────────────────────────
+// admin/moderator see everything; a 'user' sees only tasks/log entries whose
+// assignee matches their mapped person. Visibility is client-side filtering by
+// design (trusted internal staff); the rules hard-enforce the roster gate.
+function tbCanSeeAll() { return window.TB_ROLE !== 'user'; }
+function tbVisibleTasks(arr) {
+  if (tbCanSeeAll() || !Array.isArray(arr)) return arr;
+  const me = (window.TB_PERSON || '').toLowerCase();
+  if (!me) return [];
+  return arr.filter(t => ((t.assignee || getDefaultAssignee(t.cat)) || '').toLowerCase() === me);
+}
+function tbVisibleLog(arr) {
+  if (tbCanSeeAll() || !Array.isArray(arr)) return arr;
+  const me = (window.TB_PERSON || '').toLowerCase();
+  if (!me) return [];
+  return arr.filter(l => ((l.assignee || '') || '').toLowerCase() === me);
+}
+// Show/hide admin-only controls (Data Manager + Manage Access). Called after
+// the role resolves and is safe to call before the DOM links exist.
+function applyRoleToUI() {
+  const isAdmin = window.TB_ROLE === 'admin';
+  const dataLink = document.getElementById('tb-data-link');
+  if (dataLink) dataLink.style.display = isAdmin ? 'inline' : 'none';
+  const accessLink = document.getElementById('tb-access-link');
+  if (accessLink) accessLink.style.display = isAdmin ? 'inline' : 'none';
+}
 function getDefaultAssignee(catId) {
   const cat = getCatById(catId);
   const label = (cat ? cat.label : catId).toLowerCase();
@@ -899,13 +983,57 @@ function save() {
   localStorage.setItem('phil-nextid-v6', nextId);
   localStorage.setItem('phil-nextcatid-v6', nextCatId);
   localStorage.setItem('phil-people-v6', JSON.stringify(PEOPLE));
-  if (window._fbRef && window._fbSet) {
+  if (window._fbUpdate && window._fbDb && window._fbRefFn) {
     window._suppressListener = true;
     const categoriesObj = {};
     categories.forEach(c => { categoriesObj[c.id] = c; });
-    window._fbSet(window._fbRef, { tasks, categories: categoriesObj, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE })
+    // Tasks are persisted as a keyed map at taskboard/tasks/{id}. Writing each
+    // task at its own child path keeps normal edits allowed for every roster
+    // member, while a whole-`tasks`-node write (a destructive Import) stays
+    // admin-only at the rules level. Other leaves are written wholesale.
+    const patch = { categories: categoriesObj, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE };
+    const liveIds = {};
+    tasks.forEach(t => { const k = String(t.id); liveIds[k] = true; patch['tasks/' + k] = t; });
+    // Null out tasks removed since the last known DB state (delete on save).
+    const prevTasks = window._fbCache && window._fbCache.tasks ? window._fbCache.tasks : {};
+    Object.keys(prevTasks).forEach(k => { if (!liveIds[k]) patch['tasks/' + k] = null; });
+    _tbWrittenTaskKeys.forEach(k => { if (!liveIds[k]) patch['tasks/' + k] = null; });
+    _tbWrittenTaskKeys = new Set(Object.keys(liveIds));
+    window._fbUpdate(window._fbRefFn(window._fbDb, 'taskboard'), patch)
       .then(() => { showSyncNotice('Saved ☁️ ✓'); setTimeout(() => window._suppressListener = false, 1000); })
-      .catch(() => showSyncNotice('Saved locally ✓'));
+      .catch(() => { window._suppressListener = false; showSyncNotice('Saved locally ✓'); });
+  } else {
+    showSyncNotice('Saved locally ✓');
+  }
+}
+// Used only by the admin Data Manager (Import/Restore). Writes the whole
+// taskboard/tasks node at the parent path — which the rules restrict to admins
+// — so a destructive overwrite cannot be performed by a non-admin via the API.
+function saveFullDataset() {
+  localStorage.setItem('phil-tasks-v6', JSON.stringify(tasks));
+  localStorage.setItem('phil-cats-v6', JSON.stringify(categories));
+  localStorage.setItem('phil-log-v6', JSON.stringify(completionLog));
+  localStorage.setItem('phil-taskorder-v6', JSON.stringify(taskOrder));
+  localStorage.setItem('phil-nextid-v6', nextId);
+  localStorage.setItem('phil-nextcatid-v6', nextCatId);
+  localStorage.setItem('phil-people-v6', JSON.stringify(PEOPLE));
+  if (window._fbSet && window._fbUpdate && window._fbDb && window._fbRefFn) {
+    window._suppressListener = true;
+    const tasksMap = {};
+    tasks.forEach(t => { tasksMap[String(t.id)] = t; });
+    const categoriesObj = {};
+    categories.forEach(c => { categoriesObj[c.id] = c; });
+    Promise.all([
+      window._fbSet(window._fbRefFn(window._fbDb, 'taskboard/tasks'), tasksMap),
+      window._fbUpdate(window._fbRefFn(window._fbDb, 'taskboard'), { categories: categoriesObj, completionLog, taskOrder, nextId, nextCatId, people: PEOPLE })
+    ]).then(() => {
+      _tbWrittenTaskKeys = new Set(Object.keys(tasksMap));
+      showSyncNotice('Saved ☁️ ✓');
+      setTimeout(() => window._suppressListener = false, 1000);
+    }).catch((e) => {
+      window._suppressListener = false;
+      showSyncNotice('⚠️ ' + (e.code || e.message || 'Save failed — admin only'));
+    });
   } else {
     showSyncNotice('Saved locally ✓');
   }
@@ -921,9 +1049,10 @@ function getCatColor(id) {
 }
 function getBadgeStyle(id) { const c = getCatColor(id); return `background:${c.bg};color:${c.color};`; }
 function updateStats() {
-  const activeTasks = tasks.filter(t => t.col !== 'done');
-  const pendingTasks = tasks.filter(t => t.col === 'pending');
-  const completedCount = completionLog.length;
+  const vTasks = tbVisibleTasks(tasks);
+  const activeTasks = vTasks.filter(t => t.col !== 'done');
+  const pendingTasks = vTasks.filter(t => t.col === 'pending');
+  const completedCount = tbVisibleLog(completionLog).length;
   document.getElementById('s-total').textContent = activeTasks.length;
   document.getElementById('s-done').textContent = completedCount;
   document.getElementById('s-pending').textContent = pendingTasks.length;
@@ -1112,6 +1241,8 @@ function reorderWithinCol(colId, movedId, targetId, insertBefore) {
 function renderAll() {
   const wrap = document.getElementById('columns-wrap');
   wrap.innerHTML = '';
+  // Role-scoped view: a 'user' only ever sees their own assigned tasks.
+  const viewTasks = tbVisibleTasks(tasks);
   const boardCols = [...categories.filter(c => !c.archived), { id: 'pending', label: 'Pending', icon: '⏳' }];
   const isMobile = window.innerWidth <= 600;
   // Ensure activeMobileCol is valid (check user prefs first, then fallbacks)
@@ -1132,7 +1263,7 @@ function renderAll() {
       btn.type = 'button';
       btn.className = 'mobile-tab' + (col.id === activeMobileCol ? ' active' : '');
       btn.dataset.colId = col.id;
-      const count = tasks.filter(t => t.col === col.id).length;
+      const count = viewTasks.filter(t => t.col === col.id).length;
       btn.innerHTML = col.icon + ' ' + col.label + (count ? ' <span style="opacity:0.6;font-size:11px">(' + count + ')</span>' : '');
       tabBar.appendChild(btn);
     });
@@ -1151,7 +1282,7 @@ function renderAll() {
     }
   }
   boardCols.forEach(col => {
-    const colTasks = sortTasks(tasks.filter(t => t.col === col.id), col.id);
+    const colTasks = sortTasks(viewTasks.filter(t => t.col === col.id), col.id);
     const isPending = col.id === 'pending';
     const iconBg = isPending ? '#f3f4f6' : getCatColor(col.id).bg;
     const div = document.createElement('div');
@@ -1293,10 +1424,12 @@ function undoneTask(logIdx) {
 function renderHistory() {
   if (!historyPanelOpen) return; // don't render if collapsed
   const el = document.getElementById('log-list');
-  if (completionLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
+  // Role-scoped: a 'user' only sees their own completed tasks.
+  const vLog = tbVisibleLog(completionLog);
+  if (vLog.length === 0) { el.innerHTML = '<div class="empty-state">Complete tasks to see log</div>'; }
   else {
     const doneQ = (document.getElementById('done-search-input')?.value || '').toLowerCase().trim();
-    const filteredLog = doneQ ? completionLog.filter(l => (l.text||'').toLowerCase().includes(doneQ) || (l.cat||'').toLowerCase().includes(doneQ) || getCatLabel(l.cat||'').toLowerCase().includes(doneQ)) : completionLog;
+    const filteredLog = doneQ ? vLog.filter(l => (l.text||'').toLowerCase().includes(doneQ) || (l.cat||'').toLowerCase().includes(doneQ) || getCatLabel(l.cat||'').toLowerCase().includes(doneQ)) : vLog;
     el.innerHTML = filteredLog.slice(0, 60).map((l, idx) => {
       const d = new Date(l.completedAt);
       const ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
@@ -1315,7 +1448,7 @@ function renderHistory() {
   }
   const ctx = document.getElementById('monthly-chart').getContext('2d');
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-  if (completionLog.length === 0) {
+  if (vLog.length === 0) {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.font = '12px -apple-system, sans-serif'; ctx.fillStyle = '#ccc'; ctx.textAlign = 'center';
     ctx.fillText('Complete tasks to see data', ctx.canvas.width / 2, 100);
@@ -1327,7 +1460,7 @@ function renderHistory() {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }), count: 0 });
   }
-  completionLog.forEach(l => {
+  vLog.forEach(l => {
     const d = new Date(l.completedAt);
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const m = months.find(x => x.key === key);
@@ -1543,7 +1676,7 @@ function importData(event) {
         taskOrder = data.taskOrder || {};
         nextId = data.nextId || 100;
         nextCatId = data.nextCatId || 50;
-        save(); rebuildCatSelects(); renderAll(); renderHistory();
+        saveFullDataset(); rebuildCatSelects(); renderAll(); renderHistory();
         showSyncNotice(`Overwrote with "${file.name}" ✓`);
       };
 
@@ -1582,7 +1715,7 @@ function importData(event) {
             newLogCount++;
           }
         });
-        save(); rebuildCatSelects(); renderAll(); renderHistory();
+        saveFullDataset(); rebuildCatSelects(); renderAll(); renderHistory();
         showSyncNotice(`Merged: +${newTaskCount} tasks, +${newCatCount} categories ✓`);
       };
 
@@ -1713,9 +1846,12 @@ function renderPersonStats() {
   const sel = document.getElementById('person-month-select');
   const monthKey = sel ? sel.value : '';
   const grid = document.getElementById('person-grid');
+  // Role-scoped: a 'user' only sees stats for their own assigned work.
+  const vTasks = tbVisibleTasks(tasks);
+  const vLog = tbVisibleLog(completionLog);
   const assigned = {};
   PEOPLE.forEach(p => { assigned[p] = 0; });
-  tasks.forEach(tk => {
+  vTasks.forEach(tk => {
     if (!tk.col || tk.col === 'done') return; // done tasks removed from array
     const person = tk.assignee || getDefaultAssignee(tk.cat);
     if (assigned[person] !== undefined) assigned[person]++;
@@ -1723,7 +1859,7 @@ function renderPersonStats() {
   });
   const completed = {};
   PEOPLE.forEach(p => { completed[p] = 0; });
-  completionLog.forEach(l => {
+  vLog.forEach(l => {
     if (!l.completedAt) return;
     const key = l.completedAt.slice(0, 7);
     if (key !== monthKey) return;
@@ -1731,7 +1867,7 @@ function renderPersonStats() {
     if (completed[person] !== undefined) completed[person]++;
     else completed[person] = 1;
   });
-  completionLog.filter(l => l.completedAt).forEach(tk => {
+  vLog.filter(l => l.completedAt).forEach(tk => {
     const key = tk.completedAt.slice(0, 7);
     if (key !== monthKey) return;
     const person = tk.assignee || getDefaultAssignee(tk.cat);
@@ -1818,12 +1954,100 @@ rebuildCatSelects();
 
 // ── DATA MANAGER ─────────────────────────────────────────
 function openDataModal() {
+  if (window.TB_ROLE !== 'admin') { alert('Admin only'); return; }
   document.getElementById('tb-data-status').innerHTML = '';
   document.getElementById('tb-restore-filename').textContent = 'No file selected';
   document.getElementById('tb-data-modal').style.display = 'flex';
 }
 function closeDataModal() {
   document.getElementById('tb-data-modal').style.display = 'none';
+}
+
+// ── MANAGE ACCESS (admin only) ────────────────────────────
+// Writes the auth roster at taskboard/access/{emailKey}. This is the LOGIN
+// roster (email → role + optional mapped person) and is entirely separate
+// from PEOPLE (assignee names) managed by the "+ Add Person" UI.
+function openAccessModal() {
+  if (window.TB_ROLE !== 'admin') { alert('Admin only'); return; }
+  document.getElementById('acc-email').value = '';
+  document.getElementById('acc-role').value = 'user';
+  buildAssigneeSelect('acc-person', PEOPLE[0] || '');
+  onAccessRoleChange();
+  document.getElementById('acc-status').textContent = '';
+  document.getElementById('tb-access-modal').style.display = 'flex';
+  renderAccessList();
+}
+function closeAccessModal() {
+  document.getElementById('tb-access-modal').style.display = 'none';
+}
+function onAccessRoleChange() {
+  const role = document.getElementById('acc-role').value;
+  document.getElementById('acc-person').style.display = role === 'user' ? '' : 'none';
+}
+async function addAccessEntry() {
+  if (window.TB_ROLE !== 'admin') return;
+  const status = document.getElementById('acc-status');
+  const email = (document.getElementById('acc-email').value || '').trim().toLowerCase();
+  const role = document.getElementById('acc-role').value;
+  const person = role === 'user' ? (document.getElementById('acc-person').value || '') : null;
+  if (!email || email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0) {
+    status.innerHTML = '<span style="color:#f87171">Enter a valid email address.</span>'; return;
+  }
+  if (role === 'user' && !person) {
+    status.innerHTML = '<span style="color:#f87171">Pick the person this user is scoped to.</span>'; return;
+  }
+  if (!window.emailToKey || !window._fbSet || !window._fbRefFn || !window._fbDb) {
+    status.innerHTML = '<span style="color:#f87171">Not connected.</span>'; return;
+  }
+  const key = window.emailToKey(email);
+  const rec = { email, role, name: email.split('@')[0], addedAt: new Date().toISOString(), addedBy: window.TB_EMAIL || '' };
+  if (person) rec.person = person;
+  try {
+    await window._fbSet(window._fbRefFn(window._fbDb, 'taskboard/access/' + key), rec);
+    status.innerHTML = '<span style="color:#4ade80">Saved ' + escapeHtml(email) + ' as ' + escapeHtml(role) + (person ? ' → ' + escapeHtml(person) : '') + ' ✓</span>';
+    document.getElementById('acc-email').value = '';
+    renderAccessList();
+  } catch(e) {
+    status.innerHTML = '<span style="color:#f87171">Error: ' + escapeHtml(e.code || e.message || 'failed') + '</span>';
+  }
+}
+async function renderAccessList() {
+  const list = document.getElementById('acc-list');
+  list.innerHTML = '<div style="color:#475569;font-size:12px">Loading…</div>';
+  try {
+    const snap = await window._fbGet(window._fbRefFn(window._fbDb, 'taskboard/access'));
+    const data = snap.val() || {};
+    const keys = Object.keys(data);
+    if (!keys.length) {
+      list.innerHTML = '<div style="color:#475569;font-size:12px">No one added yet. Root admins always have access.</div>'; return;
+    }
+    list.innerHTML = keys.map(k => {
+      const r = data[k] || {};
+      const color = r.role === 'admin' ? '#a78bfa' : (r.role === 'moderator' ? '#38bdf8' : '#94a3b8');
+      return '<div style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 10px">'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:13px;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.email || k) + '</div>'
+        + '<div style="font-size:11px;color:' + color + '">' + escapeHtml(r.role || '?') + (r.person ? ' · 👤 ' + escapeHtml(r.person) : '') + '</div>'
+        + '</div>'
+        + '<button data-acc-key="' + escapeHtml(k) + '" data-acc-email="' + escapeHtml(r.email || k) + '" style="background:#1c0a0a;border:0.5px solid #7f1d1d;color:#f87171;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer">Remove</button>'
+        + '</div>';
+    }).join('');
+    list.querySelectorAll('button[data-acc-key]').forEach(btn => {
+      btn.addEventListener('click', () => removeAccessEntry(btn.dataset.accKey, btn.dataset.accEmail));
+    });
+  } catch(e) {
+    list.innerHTML = '<div style="color:#f87171;font-size:12px">Could not load roster: ' + escapeHtml(e.code || e.message || 'error') + '</div>';
+  }
+}
+async function removeAccessEntry(key, email) {
+  if (window.TB_ROLE !== 'admin') return;
+  if (!confirm('Remove access for ' + email + '?')) return;
+  try {
+    await window._fbSet(window._fbRefFn(window._fbDb, 'taskboard/access/' + key), null);
+    renderAccessList();
+  } catch(e) {
+    document.getElementById('acc-status').innerHTML = '<span style="color:#f87171">Error: ' + escapeHtml(e.code || e.message || 'failed') + '</span>';
+  }
 }
 function tbBackup() {
   var status = document.getElementById('tb-data-status');
@@ -1879,7 +2103,7 @@ function tbRestore(event) {
       nextId = data.nextId || nextId;
       nextCatId = data.nextCatId || nextCatId;
       if (data.people) PEOPLE = data.people;
-      save(); rebuildCatSelects(); renderAll(); updateStats(); renderHistory();
+      saveFullDataset(); rebuildCatSelects(); renderAll(); updateStats(); renderHistory();
       status.innerHTML = '<span style="color:green">✅ Restored ' + data.tasks.length + ' tasks from ' + file.name + '</span>';
     } catch(err) { status.innerHTML = '<span style="color:red">❌ Error: ' + err.message + '</span>'; }
   };
@@ -2355,6 +2579,8 @@ function goHome() {
     // 2. Modals (ordered by visual stack — topmost first)
     const dataModal = document.getElementById('tb-data-modal');
     if (dataModal && dataModal.style.display === 'flex') { closeDataModal(); return true; }
+    const accessModal = document.getElementById('tb-access-modal');
+    if (accessModal && accessModal.style.display === 'flex') { closeAccessModal(); return true; }
     const restoreModal = document.getElementById('restore-modal');
     if (restoreModal && restoreModal.classList.contains('open')) { closeRestoreModal(); return true; }
     const catModal = document.getElementById('cat-modal');
@@ -2457,6 +2683,32 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">Philinity© Rev 6.5 · <span onclick="openDataModal()" style="cursor:pointer;color:#475569">📦 Data</span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<!-- MANAGE ACCESS MODAL (admin only) -->
+<div id="tb-access-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="background:#1e293b;border-radius:16px;width:100%;max-width:520px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155;color:#e2e8f0">
+    <button onclick="closeAccessModal()" style="position:absolute;top:14px;right:14px;background:#0f172a;border:0.5px solid #334155;color:#94a3b8;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">🔑 Manage Access</div>
+    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Who can sign in · roles · task scoping</div>
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Add / update person</div>
+      <input id="acc-email" type="email" placeholder="name@example.com" autocomplete="off" style="width:100%;padding:8px 10px;border:0.5px solid #334155;border-radius:8px;font-size:13px;background:#1e293b;color:#e2e8f0;box-sizing:border-box" />
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+        <select id="acc-role" onchange="onAccessRoleChange()" style="flex:1;min-width:200px;padding:8px 10px;border:0.5px solid #334155;border-radius:8px;font-size:13px;background:#1e293b;color:#e2e8f0">
+          <option value="admin">Admin — full access + Data Manager + roster</option>
+          <option value="moderator">Moderator — sees all tasks, no Data Manager</option>
+          <option value="user" selected>User — only their assigned tasks</option>
+        </select>
+        <select id="acc-person" title="Assignee this user is scoped to" style="min-width:130px;padding:8px 10px;border:0.5px solid #334155;border-radius:8px;font-size:13px;background:#1e293b;color:#e2e8f0"></select>
+      </div>
+      <button onclick="addAccessEntry()" style="margin-top:10px;background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ Add / Update</button>
+    </div>
+    <div id="acc-status" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Current access</div>
+    <div id="acc-list" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div style="font-size:11px;color:#475569;margin-top:14px;line-height:1.6">Root admins (Phil &amp; Trinity) always have admin access and aren't listed here. A “user” only sees tasks whose assignee matches their mapped person. Changes take effect the next time that person signs in.</div>
+  </div>
+</div>
+
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">Philinity© Rev 6.6 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 🔑 Access </span>· <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
