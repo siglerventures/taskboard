@@ -544,7 +544,7 @@ onAuthStateChanged(auth, async (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.6</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.7</div>
   </div>
 </div>
 
@@ -931,6 +931,19 @@ function applyRoleToUI() {
   if (dataLink) dataLink.style.display = isAdmin ? 'inline' : 'none';
   const accessLink = document.getElementById('tb-access-link');
   if (accessLink) accessLink.style.display = isAdmin ? 'inline' : 'none';
+  // Footer user pill (avatar + name + ★ for admins) — mirrors AutoFlag's footer.
+  const pill = document.getElementById('tb-user-pill');
+  const user = window._fbAuth?.currentUser;
+  if (pill && user) {
+    const name = escapeHtml(user.displayName || user.email || 'User');
+    const photo = (user.photoURL || '').replace(/"/g, '%22');
+    const avatar = photo
+      ? '<img src="' + photo + '" alt="" style="width:14px;height:14px;border-radius:50%;vertical-align:middle;margin-right:4px">'
+      : '';
+    pill.innerHTML = '· ' + avatar + '<span>' + name + '</span>'
+      + (isAdmin ? ' <span style="color:#f59e0b">★</span>' : '');
+    pill.style.display = 'inline';
+  }
 }
 function getDefaultAssignee(catId) {
   const cat = getCatById(catId);
@@ -2709,6 +2722,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">Philinity© Rev 6.6 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 🔑 Access </span>· <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">v6.7 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 🔑 Access </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
