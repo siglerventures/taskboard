@@ -5,7 +5,7 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="app-rev" content="6.8">
+<meta name="app-rev" content="6.9">
 <script>
 // ===== Cache-bust bootstrap — rev comes from meta[app-rev] (single source of truth) =====
 // Forces a one-time ?v={rev} reload whenever the served rev doesn't match
@@ -394,8 +394,8 @@ onAuthStateChanged(auth, async (user) => {
   .done-text { font-size: 12px; color: #475569; text-decoration: line-through; flex: 1; line-height: 1.4; }
   .chart-wrap { position: relative; flex: 1; min-height: 200px; overflow-x: auto; }
   .chart-inner { min-width: 900px; height: 100%; min-height: 220px; position: relative; }
-  .log-list { max-height: 280px; overflow-y: auto; flex: 1; }
-  .log-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; padding: 7px 0; border-bottom: 0.5px solid #1e293b; }
+  .log-list { max-height: 280px; overflow-y: auto; flex: 1; padding-right: 10px; }
+  .log-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 7px 0; border-bottom: 0.5px solid #1e293b; }
   .log-item:last-child { border-bottom: none; }
   .log-text { font-size: 12px; color: #475569; text-decoration: line-through; flex: 1; line-height: 1.4; }
   .log-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
@@ -2760,6 +2760,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;"><span id="tb-version"></span> <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-history-link" onclick="var p=document.getElementById('history-panel'); if(p&&p.style.display==='none')toggleHistoryPanel(); if(p)p.scrollIntoView({behavior:'smooth',block:'start'});" style="cursor:pointer;color:#475569">· 📜 History </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;"><span id="tb-version"></span> <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-history-link" onclick="toggleHistoryPanel(); var p=document.getElementById('history-panel'); if(p&&p.style.display!=='none')p.scrollIntoView({behavior:'smooth',block:'start'});" style="cursor:pointer;color:#475569">· 📜 History </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
