@@ -5,6 +5,32 @@
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-rev" content="6.8">
+<script>
+// ===== Cache-bust bootstrap (v6.8) — mirrors AutoFlag =====
+// Forces a one-time ?v={rev} reload whenever the served rev doesn't match
+// localStorage, defeating browser/CDN caching of index.html. With <=10 users
+// this is belt-and-suspenders, but keeps Taskboard's deploy behaviour uniform
+// with the other apps so a rev bump actually reaches everyone.
+(function(){
+  try {
+    var meta = document.querySelector('meta[name="app-rev"]');
+    var rev = meta && meta.content;
+    if(!rev) return;
+    var params = new URLSearchParams(window.location.search);
+    if(params.get('v') === rev){
+      try { localStorage.setItem('tb_lastRev', rev); } catch(_){}
+      return;
+    }
+    var lastRev = null;
+    try { lastRev = localStorage.getItem('tb_lastRev'); } catch(_){}
+    if(lastRev !== rev){
+      params.set('v', rev);
+      window.location.replace(window.location.pathname + '?' + params.toString() + window.location.hash);
+    }
+  } catch(_){ /* localStorage disabled — app still works, just no cache-bust */ }
+})();
+</script>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://*.firebaseio.com https://apis.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://us-central1-philinity-893d2.cloudfunctions.net; img-src 'self' data: blob: https:; frame-src https://*.firebaseio.com https://*.firebaseapp.com https://philinity-893d2.firebaseapp.com https://accounts.google.com; object-src 'none';">
 <title>Philinity's Task Board</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
@@ -544,7 +570,7 @@ onAuthStateChanged(auth, async (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.7</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.8</div>
   </div>
 </div>
 
@@ -2700,7 +2726,7 @@ function goHome() {
 <div id="tb-access-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
   <div style="background:#1e293b;border-radius:16px;width:100%;max-width:520px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155;color:#e2e8f0">
     <button onclick="closeAccessModal()" style="position:absolute;top:14px;right:14px;background:#0f172a;border:0.5px solid #334155;color:#94a3b8;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button>
-    <div style="font-size:20px;font-weight:700;margin-bottom:4px">🔑 Manage Access</div>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">👥 People &amp; Access</div>
     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Who can sign in · roles · task scoping</div>
     <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">
       <div style="font-size:13px;font-weight:600;margin-bottom:10px">Add / update person</div>
@@ -2722,6 +2748,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">v6.7 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 🔑 Access </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">v6.8 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-history-link" onclick="var p=document.getElementById('history-panel'); if(p&&p.style.display==='none')toggleHistoryPanel(); if(p)p.scrollIntoView({behavior:'smooth',block:'start'});" style="cursor:pointer;color:#475569">· 📜 History </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
