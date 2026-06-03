@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="app-rev" content="6.8">
 <script>
-// ===== Cache-bust bootstrap (v6.8) — mirrors AutoFlag =====
+// ===== Cache-bust bootstrap — rev comes from meta[app-rev] (single source of truth) =====
 // Forces a one-time ?v={rev} reload whenever the served rev doesn't match
 // localStorage, defeating browser/CDN caching of index.html. With <=10 users
 // this is belt-and-suspenders, but keeps Taskboard's deploy behaviour uniform
@@ -30,6 +30,18 @@
     }
   } catch(_){ /* localStorage disabled — app still works, just no cache-bust */ }
 })();
+</script>
+<script>
+// Single source of truth: the version is defined ONCE in <meta name="app-rev">
+// above. This fills the footer (vN.N) and login screen (Version N.N) from it
+// at load, so the displayed rev can never drift. To release a new version,
+// bump ONLY the meta tag.
+document.addEventListener('DOMContentLoaded', function(){
+  var rev = (document.querySelector('meta[name="app-rev"]') || {}).content || '';
+  if(!rev) return;
+  var f = document.getElementById('tb-version');       if(f) f.textContent = 'v' + rev;
+  var l = document.getElementById('tb-login-version'); if(l) l.textContent = rev;
+});
 </script>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdnjs.cloudflare.com https://*.firebaseio.com https://apis.google.com https://*.googleapis.com; style-src 'self' 'unsafe-inline'; connect-src 'self' https://*.firebaseio.com wss://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com https://us-central1-philinity-893d2.cloudfunctions.net; img-src 'self' data: blob: https:; frame-src https://*.firebaseio.com https://*.firebaseapp.com https://philinity-893d2.firebaseapp.com https://accounts.google.com; object-src 'none';">
 <title>Philinity's Task Board</title>
@@ -570,7 +582,7 @@ onAuthStateChanged(auth, async (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center">Incorrect password — try again</div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 6.8</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version <span id="tb-login-version"></span></div>
   </div>
 </div>
 
@@ -2748,6 +2760,6 @@ function goHome() {
   </div>
 </div>
 
-<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;">v6.8 <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-history-link" onclick="var p=document.getElementById('history-panel'); if(p&&p.style.display==='none')toggleHistoryPanel(); if(p)p.scrollIntoView({behavior:'smooth',block:'start'});" style="cursor:pointer;color:#475569">· 📜 History </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<div style="text-align:center; padding: 4px 0; font-size: 11px; color: #334155;"><span id="tb-version"></span> <span id="tb-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span id="tb-history-link" onclick="var p=document.getElementById('history-panel'); if(p&&p.style.display==='none')toggleHistoryPanel(); if(p)p.scrollIntoView({behavior:'smooth',block:'start'});" style="cursor:pointer;color:#475569">· 📜 History </span><span id="tb-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="tb-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Task Board?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 </body>
 </html>
