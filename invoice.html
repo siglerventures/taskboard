@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simple Invoicing v1.0</title>
+<style>
+  :root{
+    --purple:#5b3df5;
+    --purple-dark:#4a2fd0;
+    --lav:#e6e0f8;
+    --ink:#1f2430;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --band:#f0edfa;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:#eceef2; color:var(--ink);
+    font-family:"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
+
+  /* ---------- toolbar (never printed) ---------- */
+  .toolbar{
+    position:sticky; top:0; z-index:50;
+    background:#fff; border-bottom:1px solid var(--line);
+    padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+  }
+  .toolbar .brand{ font-weight:700; color:var(--purple); margin-right:auto; }
+  .toolbar button, .toolbar select{
+    font:inherit; font-size:14px; padding:8px 14px; border-radius:8px;
+    border:1px solid var(--line); background:#fff; cursor:pointer;
+  }
+  .toolbar button:hover{ background:#f6f5fc; }
+  .toolbar button.primary{ background:var(--purple); border-color:var(--purple); color:#fff; }
+  .toolbar button.primary:hover{ background:var(--purple-dark); }
+  .toolbar select{ max-width:230px; }
+  .hint{ font-size:12px; color:var(--muted); padding:6px 16px 0; text-align:center; }
+
+  /* ---------- page / sheet ---------- */
+  .sheet{
+    width:8.5in; max-width:100%; min-height:10in; margin:18px auto 40px;
+    background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.12);
+    display:flex; flex-direction:column;
+  }
+
+  /* header with lavender wave */
+  .head{ position:relative; padding:28px 40px 0; }
+  .head .row{ display:flex; justify-content:space-between; gap:20px; position:relative; z-index:1; }
+  .company-name{ font-size:26px; font-weight:800; outline:none; }
+  .company-name .accent{ color:#e6a817; }
+  .tagline{ margin-top:6px; font-style:italic; font-weight:600; color:var(--purple); font-size:14px; outline:none; }
+  .company-addr{ text-align:right; font-size:14px; line-height:1.45; white-space:pre-line; outline:none; }
+  .wave{ height:70px; margin:6px -40px 0; position:relative; overflow:hidden; }
+  .wave svg{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  .body{ padding:8px 40px 30px; flex:1; display:flex; flex-direction:column; }
+
+  .customer{ font-size:14.5px; line-height:1.5; white-space:pre-line; min-height:60px; outline:none; margin-top:8px; }
+
+  h1.invnum{ color:var(--purple); font-weight:600; font-size:30px; margin:22px 0 14px; }
+  h1.invnum span{ outline:none; }
+
+  .meta{
+    display:grid; grid-template-columns:1fr 1fr 1fr 1fr;
+    background:var(--band); border-radius:6px; padding:10px 14px; gap:8px;
+  }
+  .meta .k{ font-weight:700; font-size:13.5px; }
+  .meta .v{ font-size:14px; margin-top:3px; outline:none; min-height:18px; }
+
+  /* items table */
+  table.items{ width:100%; border-collapse:collapse; margin-top:26px; font-size:14.5px; }
+  table.items th{
+    text-align:left; font-weight:600; color:var(--ink);
+    border-bottom:2px solid var(--ink); padding:8px 10px;
+  }
+  table.items th.num, table.items td.num{ text-align:right; }
+  table.items th.qty{ color:var(--purple); }
+  table.items td{ padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.items tbody tr:nth-child(odd) td{ background:var(--band); }
+  table.items td[contenteditable]{ outline:none; }
+  td.del{ width:26px; text-align:center; border-bottom:1px solid var(--line); background:#fff !important; }
+  td.del button{ border:none; background:none; color:#c33; cursor:pointer; font-size:15px; visibility:hidden; }
+  tr:hover td.del button{ visibility:visible; }
+
+  .notes{ font-style:italic; font-size:13.5px; margin:14px 2px 0; outline:none; min-height:18px; }
+
+  .bottom{ display:flex; justify-content:space-between; align-items:flex-start; margin-top:26px; gap:20px; }
+  .paycomm{ font-size:14px; outline:none; }
+  .totals{ min-width:280px; }
+  .totals .trow{ display:flex; justify-content:space-between; padding:8px 12px; font-size:14.5px; }
+  .totals .grand{ border-top:2px solid var(--ink); font-weight:700; color:var(--purple); font-size:16px; }
+  .totals .grand .amt{ color:var(--purple); }
+
+  .foot{ padding:14px 40px 22px; text-align:center; color:var(--muted); font-size:12.5px; white-space:pre-line; outline:none; }
+
+  [contenteditable]:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
+  [contenteditable]:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{ size:letter; margin:0; }
+    body{ background:#fff; }
+    .toolbar, .hint, td.del, .noprint{ display:none !important; }
+    .sheet{ box-shadow:none; margin:0; width:auto; min-height:0; }
+    [contenteditable]:hover, [contenteditable]:focus{ background:transparent; box-shadow:none; }
+    table.items tbody tr:nth-child(odd) td, .meta{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="brand">🧾 Simple Invoicing</span>
+  <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
+  <button onclick="window.newInvoice()">➕ New Invoice</button>
+  <button onclick="window.addRow()">＋ Add Line</button>
+  <button onclick="window.saveInvoice()">💾 Save</button>
+  <button onclick="window.deleteInvoice()">🗑 Delete</button>
+  <button class="primary" onclick="window.doPrint()">🖨 Print</button>
+</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Use 💾 Save to keep an invoice, 🖨 Print to print or save as PDF.</div>
+
+<div class="sheet">
+  <div class="head">
+    <div class="row">
+      <div>
+        <div class="company-name" id="coName" contenteditable="true">computer<span class="accent">central</span></div>
+        <div class="tagline" id="coTag" contenteditable="true">Your Technical Solution Provider</div>
+      </div>
+      <div class="company-addr" id="coAddr" contenteditable="true">Computer Central
+1550 S Cloverdale Rd
+Boise ID 83709-1128
+United States</div>
+    </div>
+    <div class="wave">
+      <svg viewBox="0 0 800 70" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0,10 C200,80 420,-30 800,45 L800,52 C420,-22 200,88 0,18 Z" fill="#e6e0f8"></path>
+        <path d="M0,14 C200,84 420,-26 800,49 L800,70 L0,70 Z" fill="#ffffff"></path>
+        <path d="M0,0 L0,12 C200,82 420,-28 800,47 L800,0 Z" fill="#ffffff"></path>
+        <path d="M0,6 C200,76 420,-34 800,41 L800,49 C420,-26 200,84 0,14 Z" fill="#d8d0f2"></path>
+      </svg>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="customer" id="customer" contenteditable="true">Customer Name
+Street Address
+City, ST 00000
+United States</div>
+
+    <h1 class="invnum">Invoice <span id="invNum" contenteditable="true">INV/2026/00001</span></h1>
+
+    <div class="meta">
+      <div><div class="k">Invoice Date</div><div class="v" id="mDate" contenteditable="true"></div></div>
+      <div><div class="k">Due Date</div><div class="v" id="mDue" contenteditable="true"></div></div>
+      <div><div class="k">Source</div><div class="v" id="mSource" contenteditable="true"></div></div>
+      <div><div class="k">Reference</div><div class="v" id="mRef" contenteditable="true"></div></div>
+    </div>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:46%">Description</th>
+          <th class="num qty" style="width:16%">Quantity</th>
+          <th class="num" style="width:18%">Unit Price</th>
+          <th class="num" style="width:20%">Amount</th>
+          <th class="del noprint"></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <div class="notes" id="notes" contenteditable="true">"Campground Master" RV Software Setup for additional user and Remote Connection.</div>
+
+    <div class="bottom">
+      <div class="paycomm">Payment Communication: <strong id="payComm">INV/2026/00001</strong></div>
+      <div class="totals">
+        <div class="trow grand"><span>Total</span><span class="amt" id="grand">$ 0.00</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot" id="foot" contenteditable="true">Thank you for your business!</div>
+</div>
+
+<script>
+(function(){
+  const LS_CO   = 'sinv_company';
+  const LS_SEQ  = 'sinv_seq';
+  const LS_DOCS = 'sinv_docs';
+
+  const $ = id => document.getElementById(id);
+  const money = n => '$ ' + (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
+  const num = s => parseFloat(String(s).replace(/[^0-9.\-]/g,'')) || 0;
+  const today = () => { const d=new Date(); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+'/'+d.getFullYear(); };
+
+  /* ---------- rows ---------- */
+  function rowHtml(desc, qty, price){
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td contenteditable="true" class="c-desc"></td>'+
+      '<td contenteditable="true" class="num c-qty"></td>'+
+      '<td contenteditable="true" class="num c-price"></td>'+
+      '<td class="num c-amt">$ 0.00</td>'+
+      '<td class="del noprint"><button title="Remove line" onclick="this.closest(\'tr\').remove(); window.recalc()">✕</button></td>';
+    tr.querySelector('.c-desc').textContent  = desc  || '';
+    tr.querySelector('.c-qty').textContent   = qty   || '1.00';
+    tr.querySelector('.c-price').textContent = price || '0.00';
+    return tr;
+  }
+
+  window.addRow = function(desc, qty, price){
+    $('rows').appendChild(rowHtml(desc, qty, price));
+    recalc();
+  };
+
+  window.recalc = recalc;
+  function recalc(){
+    let total = 0;
+    $('rows').querySelectorAll('tr').forEach(tr=>{
+      const amt = num(tr.querySelector('.c-qty').textContent) * num(tr.querySelector('.c-price').textContent);
+      tr.querySelector('.c-amt').textContent = money(amt);
+      total += amt;
+    });
+    $('grand').textContent = money(total);
+  }
+  $('rows').addEventListener('input', recalc);
+  $('invNum').addEventListener('input', ()=>{ $('payComm').textContent = $('invNum').textContent.trim(); });
+
+  /* ---------- company persistence ---------- */
+  const CO_FIELDS = ['coName','coTag','coAddr','foot'];
+  function saveCompany(){
+    const o = {};
+    CO_FIELDS.forEach(id => o[id] = $(id).innerHTML);
+    try{ localStorage.setItem(LS_CO, JSON.stringify(o)); }catch(e){}
+  }
+  function loadCompany(){
+    try{
+      const o = JSON.parse(localStorage.getItem(LS_CO)||'null');
+      if(o) CO_FIELDS.forEach(id => { if(o[id]!=null) $(id).innerHTML = o[id]; });
+    }catch(e){}
+  }
+  CO_FIELDS.forEach(id => $(id).addEventListener('blur', saveCompany));
+
+  /* ---------- invoice numbering ---------- */
+  function nextNumber(){
+    let seq = 1;
+    try{ seq = (parseInt(localStorage.getItem(LS_SEQ)||'0',10)||0) + 1; localStorage.setItem(LS_SEQ, String(seq)); }catch(e){}
+    return 'INV/' + new Date().getFullYear() + '/' + String(seq).padStart(5,'0');
+  }
+
+  /* ---------- new / save / load / delete ---------- */
+  window.newInvoice = function(fresh){
+    const n = nextNumber();
+    $('invNum').textContent = n;
+    $('payComm').textContent = n;
+    $('mDate').textContent = today();
+    $('mDue').textContent = today();
+    $('mSource').textContent = '';
+    $('mRef').textContent = '';
+    $('customer').textContent = 'Customer Name\nStreet Address\nCity, ST 00000\nUnited States';
+    $('notes').textContent = '';
+    $('rows').innerHTML = '';
+    window.addRow('', '1.00', '0.00');
+    $('savedList').value = '';
+  };
+
+  function docs(){ try{ return JSON.parse(localStorage.getItem(LS_DOCS)||'{}'); }catch(e){ return {}; } }
+  function putDocs(d){ try{ localStorage.setItem(LS_DOCS, JSON.stringify(d)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
+
+  window.saveInvoice = function(){
+    const key = $('invNum').textContent.trim() || nextNumber();
+    const d = docs();
+    d[key] = {
+      inv:key, date:$('mDate').textContent, due:$('mDue').textContent,
+      source:$('mSource').textContent, ref:$('mRef').textContent,
+      customer:$('customer').innerHTML, notes:$('notes').innerHTML,
+      rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
+        desc: tr.querySelector('.c-desc').textContent,
+        qty:  tr.querySelector('.c-qty').textContent,
+        price:tr.querySelector('.c-price').textContent
+      }))
+    };
+    putDocs(d);
+    refreshList(key);
+  };
+
+  window.loadSelected = function(){
+    const key = $('savedList').value;
+    if(!key) return;
+    const rec = docs()[key];
+    if(!rec) return;
+    $('invNum').textContent = rec.inv; $('payComm').textContent = rec.inv;
+    $('mDate').textContent = rec.date||''; $('mDue').textContent = rec.due||'';
+    $('mSource').textContent = rec.source||''; $('mRef').textContent = rec.ref||'';
+    $('customer').innerHTML = rec.customer||''; $('notes').innerHTML = rec.notes||'';
+    $('rows').innerHTML = '';
+    (rec.rows&&rec.rows.length?rec.rows:[{desc:'',qty:'1.00',price:'0.00'}])
+      .forEach(r=>$('rows').appendChild(rowHtml(r.desc,r.qty,r.price)));
+    recalc();
+  };
+
+  window.deleteInvoice = function(){
+    const key = $('savedList').value || $('invNum').textContent.trim();
+    const d = docs();
+    if(!d[key]){ alert('This invoice is not saved.'); return; }
+    if(!confirm('Delete saved invoice ' + key + '?')) return;
+    delete d[key]; putDocs(d); refreshList('');
+  };
+
+  function refreshList(sel){
+    const d = docs();
+    const s = $('savedList');
+    s.innerHTML = '<option value="">— Saved invoices —</option>';
+    Object.keys(d).sort().reverse().forEach(k=>{
+      const o = document.createElement('option'); o.value = k; o.textContent = k; s.appendChild(o);
+    });
+    s.value = sel || '';
+  }
+
+  window.doPrint = function(){ document.activeElement && document.activeElement.blur(); window.print(); };
+
+  /* ---------- init ---------- */
+  loadCompany();
+  refreshList('');
+  $('mDate').textContent = today();
+  $('mDue').textContent = today();
+  window.addRow('Technical Support', '1.00', '100.00');
+  const n0 = $('invNum').textContent.trim();
+  $('payComm').textContent = n0;
+})();
+</script>
+</body>
+</html>
