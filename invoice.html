@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.9</title>
+<title>Simple Invoicing v1.10</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -175,6 +175,20 @@
   .st-paid{ color:var(--green); font-weight:700; }
   .st-unpaid{ color:var(--red); font-weight:700; }
   .report .pl{ margin-top:22px; font-size:13px; color:var(--muted); }
+  .report h2{ color:var(--purple); font-size:17px; font-weight:600; margin:26px 0 8px; }
+  .report .rctrl{ margin:0 0 12px; font-size:14px; }
+  .report .rctrl select{ font:inherit; font-size:14px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; }
+  table.rtab tfoot td{ border-top:2px solid var(--ink); font-weight:700; }
+  table.rtab td.neg{ color:var(--red); }
+  .report h2 button{
+    font:inherit; font-size:13px; padding:4px 10px; margin-left:10px; vertical-align:2px;
+    border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer;
+  }
+  .report h2 button:hover{ background:#f6f5fc; }
+  #expRows td[contenteditable]{ outline:none; }
+  #expRows td.xdel{ width:26px; text-align:center; }
+  #expRows td.xdel button{ border:none; background:none; color:#c33; cursor:pointer; visibility:hidden; }
+  #expRows tr:hover td.xdel button{ visibility:visible; }
 
   /* ---------- print ---------- */
   @media print{
@@ -276,6 +290,7 @@ United States</div>
   <div class="body" style="padding:0">
     <h1>Invoice Report</h1>
     <div class="rsub" id="rsub"></div>
+    <div class="rctrl noprint">Month: <select id="rMonth" onchange="window.reportFilter()"></select></div>
     <div class="rtiles">
       <div class="rtile"><div class="k">Total Invoiced</div><div class="v" id="rInvoiced">$ 0.00</div></div>
       <div class="rtile good"><div class="k">Collected (Paid)</div><div class="v" id="rPaid">$ 0.00</div></div>
@@ -289,7 +304,27 @@ United States</div>
       </tr></thead>
       <tbody id="rRows"></tbody>
     </table>
-    <div class="pl">P&amp;L (cash basis): income received = Collected above. Sales tax collected is money you owe the state, not income.</div>
+
+    <h2>Monthly P&amp;L</h2>
+    <table class="rtab">
+      <thead><tr>
+        <th>Month</th>
+        <th class="num">Invoiced</th><th class="num">Collected</th><th class="num">Outstanding</th>
+        <th class="num">Tax Collected</th><th class="num">Expenses</th><th class="num">Net Profit</th>
+      </tr></thead>
+      <tbody id="plRows"></tbody>
+      <tfoot id="plFoot"></tfoot>
+    </table>
+
+    <h2>Expenses <button class="noprint" onclick="window.addExpense()">＋ Add Expense</button></h2>
+    <table class="rtab" id="expTab">
+      <thead><tr>
+        <th style="width:130px">Date</th><th>Description</th><th class="num" style="width:130px">Amount</th><th class="noprint" style="width:26px"></th>
+      </tr></thead>
+      <tbody id="expRows"></tbody>
+    </table>
+
+    <div class="pl">Cash-basis P&amp;L: Invoiced and Outstanding count by invoice date; Collected and Tax Collected count by the date the invoice was marked paid — Tax Collected is what you owe the state for that month. Net Profit = Collected − Tax Collected − Expenses.</div>
   </div>
 </div>
 
@@ -723,33 +758,69 @@ United States</div>
   };
 
   /* ---------- report ---------- */
-  function buildReport(){
+  const LS_EXP = 'sinv_exp';
+  const expenses = () => lsGet(LS_EXP, []);
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function monthKey(s){
+    const m = String(s||'').match(/(\d{1,2})\/\d{1,2}\/(\d{4})/);
+    return m ? m[2] + '-' + String(parseInt(m[1],10)).padStart(2,'0') : null;
+  }
+  function monthLabel(k){ const p = k.split('-'); return MONTHS[parseInt(p[1],10)-1] + ' ' + p[0]; }
+  function docTotals(r){
+    let total = r.total, tax = r.tax;
+    if(total == null){ // older saves: rebuild from rows, no tax info
+      total = (r.rows||[]).reduce((s,row)=>s + num(row.qty)*num(row.price), 0);
+      tax = 0;
+    }
+    return { total: total, tax: tax||0 };
+  }
+  function docCustomer(r){
+    const el = document.createElement('div');
+    el.innerHTML = String(r.customer||'').replace(/<br[^>]*>|<\/(div|p)>/gi,'\n');
+    const cust = (el.textContent||'').split('\n')[0].trim();
+    return cust && cust.toLowerCase() !== 'customer name' ? cust : '—';
+  }
+
+  function renderMonthOptions(){
+    const seen = {};
     const d = docs();
-    let invoiced=0, paid=0, tax=0, taxPaid=0;
+    Object.keys(d).forEach(k=>{
+      const mk1 = monthKey(d[k].date); if(mk1) seen[mk1] = 1;
+      const mk2 = monthKey(d[k].paidDate); if(mk2) seen[mk2] = 1;
+    });
+    expenses().forEach(e=>{ const mk = monthKey(e.date); if(mk) seen[mk] = 1; });
+    const s = $('rMonth');
+    const cur = s.value || 'all';
+    s.innerHTML = '<option value="all">All months</option>';
+    Object.keys(seen).sort().reverse().forEach(k=>{
+      const o = document.createElement('option'); o.value = k; o.textContent = monthLabel(k); s.appendChild(o);
+    });
+    s.value = Array.from(s.options).some(o=>o.value===cur) ? cur : 'all';
+  }
+
+  // tiles + per-invoice table, filtered by invoice-date month
+  function renderMain(){
+    const filter = $('rMonth').value || 'all';
+    const d = docs();
+    let invoiced=0, paid=0, taxPaid=0;
     const tb = $('rRows');
     tb.innerHTML = '';
     Object.keys(d).sort().reverse().forEach(k=>{
       const r = d[k];
-      let total = r.total, rtax = r.tax;
-      if(total == null){ // older saves: rebuild from rows, no tax info
-        total = (r.rows||[]).reduce((s,row)=>s + num(row.qty)*num(row.price), 0);
-        rtax = 0;
-      }
-      invoiced += total; tax += (rtax||0);
-      if(r.paid){ paid += total; taxPaid += (rtax||0); }
-      const el = document.createElement('div');
-      el.innerHTML = String(r.customer||'').replace(/<br[^>]*>|<\/(div|p)>/gi,'\n');
-      const cust = (el.textContent||'').split('\n')[0].trim();
+      if(filter !== 'all' && monthKey(r.date) !== filter) return;
+      const t = docTotals(r);
+      invoiced += t.total;
+      if(r.paid){ paid += t.total; taxPaid += t.tax; }
       const tr = document.createElement('tr');
       tr.innerHTML = '<td></td><td></td><td></td><td class="num"></td><td class="num"></td><td></td>';
       tr.title = 'Double-click to open this invoice';
       tr.addEventListener('dblclick', ()=>{ $('savedList').value = k; window.loadSelected(); });
       const tds = tr.children;
       tds[0].textContent = '#' + k;
-      tds[1].textContent = cust && cust.toLowerCase() !== 'customer name' ? cust : '—';
+      tds[1].textContent = docCustomer(r);
       tds[2].textContent = r.date || '';
-      tds[3].textContent = money(total);
-      tds[4].textContent = money(rtax||0);
+      tds[3].textContent = money(t.total);
+      tds[4].textContent = money(t.tax);
       tds[5].innerHTML = r.paid
         ? '<span class="st-paid">Paid' + (r.paidDate ? ' ' + r.paidDate : '') + '</span>'
         : '<span class="st-unpaid">Unpaid</span>';
@@ -759,8 +830,105 @@ United States</div>
     $('rPaid').textContent = money(paid);
     $('rDue').textContent = money(invoiced - paid);
     $('rTax').textContent = money(taxPaid);
-    $('rsub').textContent = 'All saved invoices as of ' + today() + ' — tax collected counts paid invoices only.';
+    $('rsub').textContent = (filter === 'all' ? 'All saved invoices' : monthLabel(filter)) +
+      ' as of ' + today() + ' — tax collected counts paid invoices only.';
   }
+
+  // monthly P&L: Invoiced/Outstanding by invoice date; Collected/Tax by paid date
+  function renderPL(){
+    const d = docs();
+    const m = {};
+    const bucket = k => m[k] || (m[k] = {inv:0, col:0, out:0, tax:0, exp:0});
+    Object.keys(d).forEach(k=>{
+      const r = d[k]; const t = docTotals(r);
+      const mi = monthKey(r.date);
+      if(mi){ bucket(mi).inv += t.total; if(!r.paid) bucket(mi).out += t.total; }
+      if(r.paid){ const mp = monthKey(r.paidDate) || mi; if(mp){ bucket(mp).col += t.total; bucket(mp).tax += t.tax; } }
+    });
+    expenses().forEach(e=>{ const mk = monthKey(e.date); if(mk) bucket(mk).exp += num(e.amount); });
+    const tb = $('plRows');
+    tb.innerHTML = '';
+    const tot = {inv:0, col:0, out:0, tax:0, exp:0, net:0};
+    Object.keys(m).sort().reverse().forEach(k=>{
+      const b = m[k];
+      const net = b.col - b.tax - b.exp;
+      tot.inv+=b.inv; tot.col+=b.col; tot.out+=b.out; tot.tax+=b.tax; tot.exp+=b.exp; tot.net+=net;
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td>';
+      const tds = tr.children;
+      tds[0].textContent = monthLabel(k);
+      tds[1].textContent = money(b.inv);
+      tds[2].textContent = money(b.col);
+      tds[3].textContent = money(b.out);
+      tds[4].textContent = money(b.tax);
+      tds[5].textContent = money(b.exp);
+      tds[6].textContent = money(net);
+      if(net < 0) tds[6].classList.add('neg');
+      if(b.out > 0) tds[3].classList.add('neg');
+      tb.appendChild(tr);
+    });
+    $('plFoot').innerHTML = '';
+    const tf = document.createElement('tr');
+    tf.innerHTML = '<td>Total</td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td><td class="num"></td>';
+    const fds = tf.children;
+    fds[1].textContent = money(tot.inv); fds[2].textContent = money(tot.col);
+    fds[3].textContent = money(tot.out); fds[4].textContent = money(tot.tax);
+    fds[5].textContent = money(tot.exp); fds[6].textContent = money(tot.net);
+    if(tot.net < 0) fds[6].classList.add('neg');
+    $('plFoot').appendChild(tf);
+  }
+
+  /* ---------- expense log ---------- */
+  function renderExpenses(){
+    const tb = $('expRows');
+    tb.innerHTML = '';
+    expenses().forEach((e, i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td contenteditable="true" class="x-date"></td>'+
+        '<td contenteditable="true" class="x-desc"></td>'+
+        '<td contenteditable="true" class="num x-amt"></td>'+
+        '<td class="xdel noprint"><button title="Remove expense">✕</button></td>';
+      tr.children[0].textContent = e.date || '';
+      tr.children[1].textContent = e.desc || '';
+      tr.children[2].textContent = money(num(e.amount));
+      tr.children[3].querySelector('button').addEventListener('click', ()=>{
+        const arr = expenses(); arr.splice(i,1); lsPut(LS_EXP, arr);
+        renderExpenses(); renderMonthOptions(); renderPL();
+      });
+      tb.appendChild(tr);
+    });
+  }
+  function saveExpensesFromDOM(){
+    const arr = [];
+    $('expRows').querySelectorAll('tr').forEach(tr=>{
+      arr.push({
+        date: tr.querySelector('.x-date').textContent.trim(),
+        desc: tr.querySelector('.x-desc').textContent.trim(),
+        amount: num(tr.querySelector('.x-amt').textContent)
+      });
+    });
+    lsPut(LS_EXP, arr);
+  }
+  $('expRows').addEventListener('focusout', e=>{
+    saveExpensesFromDOM();
+    const a = e.target.closest ? e.target.closest('.x-amt') : null;
+    if(a) a.textContent = money(num(a.textContent));
+    renderMonthOptions(); renderPL();
+  });
+  window.addExpense = function(){
+    const arr = expenses();
+    arr.push({date:today(), desc:'', amount:0});
+    lsPut(LS_EXP, arr);
+    renderExpenses(); renderMonthOptions(); renderPL();
+  };
+
+  function buildReport(){
+    renderMonthOptions();
+    renderMain();
+    renderPL();
+    renderExpenses();
+  }
+  window.reportFilter = function(){ renderMain(); };
   function setReport(on){
     document.body.classList.toggle('reporting', on);
     $('reportBtn').textContent = on ? '🧾 Invoice' : '📊 Report';
