@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.1</title>
+<title>Simple Invoicing v1.2</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -110,13 +110,14 @@
 <div class="toolbar">
   <span class="brand">🧾 Simple Invoicing</span>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
+  <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
   <button onclick="window.addRow()">＋ Add Line</button>
   <button onclick="window.saveInvoice()">💾 Save</button>
   <button onclick="window.deleteInvoice()">🗑 Delete</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Use 💾 Save to keep an invoice, 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. 💾 Save keeps the invoice and remembers the customer (pick past customers from the Customers list). 🖨 Print to print or save as PDF.</div>
 
 <div class="sheet">
   <div class="head">
@@ -184,6 +185,7 @@ United States</div>
   const LS_CO   = 'sinv_company';
   const LS_SEQ  = 'sinv_seq';
   const LS_DOCS = 'sinv_docs';
+  const LS_CUST = 'sinv_custs';
 
   const $ = id => document.getElementById(id);
   const money = n => '$ ' + (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
@@ -270,10 +272,37 @@ United States</div>
     $('rows').innerHTML = '';
     window.addRow('', '1.00', '0.00');
     $('savedList').value = '';
+    $('custList').value = '';
   };
 
   function docs(){ try{ return JSON.parse(localStorage.getItem(LS_DOCS)||'{}'); }catch(e){ return {}; } }
   function putDocs(d){ try{ localStorage.setItem(LS_DOCS, JSON.stringify(d)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
+
+  /* ---------- customer book ---------- */
+  function custs(){ try{ return JSON.parse(localStorage.getItem(LS_CUST)||'{}'); }catch(e){ return {}; } }
+  function rememberCustomer(){
+    const name = ($('customer').innerText||'').split('\n')[0].trim();
+    if(!name || name.toLowerCase() === 'customer name') return;
+    const c = custs();
+    c[name] = $('customer').innerHTML;
+    try{ localStorage.setItem(LS_CUST, JSON.stringify(c)); }catch(e){}
+    refreshCustList(name);
+  }
+  window.loadCustomer = function(){
+    const key = $('custList').value;
+    if(!key) return;
+    const c = custs()[key];
+    if(c != null) $('customer').innerHTML = c;
+  };
+  function refreshCustList(sel){
+    const c = custs();
+    const s = $('custList');
+    s.innerHTML = '<option value="">— Customers —</option>';
+    Object.keys(c).sort((a,b)=>a.localeCompare(b)).forEach(k=>{
+      const o = document.createElement('option'); o.value = k; o.textContent = k; s.appendChild(o);
+    });
+    s.value = sel || '';
+  }
 
   window.saveInvoice = function(){
     const key = $('invNum').textContent.trim() || nextNumber();
@@ -290,6 +319,7 @@ United States</div>
     };
     putDocs(d);
     refreshList(key);
+    rememberCustomer();
   };
 
   window.loadSelected = function(){
@@ -330,6 +360,7 @@ United States</div>
   /* ---------- init ---------- */
   loadCompany();
   refreshList('');
+  refreshCustList('');
   $('mDate').textContent = today();
   $('mDue').textContent = today();
   window.addRow('Technical Support', '1.00', '100.00');
