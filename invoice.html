@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.0</title>
+<title>Simple Invoicing v1.2</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -60,7 +60,7 @@
   h1.invnum span{ outline:none; }
 
   .meta{
-    display:grid; grid-template-columns:1fr 1fr 1fr 1fr;
+    display:grid; grid-template-columns:1fr 1fr 1fr;
     background:var(--band); border-radius:6px; padding:10px 14px; gap:8px;
   }
   .meta .k{ font-weight:700; font-size:13.5px; }
@@ -83,8 +83,7 @@
 
   .notes{ font-style:italic; font-size:13.5px; margin:14px 2px 0; outline:none; min-height:18px; }
 
-  .bottom{ display:flex; justify-content:space-between; align-items:flex-start; margin-top:26px; gap:20px; }
-  .paycomm{ font-size:14px; outline:none; }
+  .bottom{ display:flex; justify-content:flex-end; align-items:flex-start; margin-top:26px; gap:20px; }
   .totals{ min-width:280px; }
   .totals .trow{ display:flex; justify-content:space-between; padding:8px 12px; font-size:14.5px; }
   .totals .grand{ border-top:2px solid var(--ink); font-weight:700; color:var(--purple); font-size:16px; }
@@ -111,13 +110,14 @@
 <div class="toolbar">
   <span class="brand">🧾 Simple Invoicing</span>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
+  <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
   <button onclick="window.addRow()">＋ Add Line</button>
   <button onclick="window.saveInvoice()">💾 Save</button>
   <button onclick="window.deleteInvoice()">🗑 Delete</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Use 💾 Save to keep an invoice, 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. 💾 Save keeps the invoice and remembers the customer (pick past customers from the Customers list). 🖨 Print to print or save as PDF.</div>
 
 <div class="sheet">
   <div class="head">
@@ -152,7 +152,6 @@ United States</div>
     <div class="meta">
       <div><div class="k">Invoice Date</div><div class="v" id="mDate" contenteditable="true"></div></div>
       <div><div class="k">Due Date</div><div class="v" id="mDue" contenteditable="true"></div></div>
-      <div><div class="k">Source</div><div class="v" id="mSource" contenteditable="true"></div></div>
       <div><div class="k">Reference</div><div class="v" id="mRef" contenteditable="true"></div></div>
     </div>
 
@@ -172,7 +171,6 @@ United States</div>
     <div class="notes" id="notes" contenteditable="true">"Campground Master" RV Software Setup for additional user and Remote Connection.</div>
 
     <div class="bottom">
-      <div class="paycomm">Payment Communication: <strong id="payComm">INV/2026/00001</strong></div>
       <div class="totals">
         <div class="trow grand"><span>Total</span><span class="amt" id="grand">$ 0.00</span></div>
       </div>
@@ -187,6 +185,7 @@ United States</div>
   const LS_CO   = 'sinv_company';
   const LS_SEQ  = 'sinv_seq';
   const LS_DOCS = 'sinv_docs';
+  const LS_CUST = 'sinv_custs';
 
   const $ = id => document.getElementById(id);
   const money = n => '$ ' + (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
@@ -224,7 +223,6 @@ United States</div>
     $('grand').textContent = money(total);
   }
   $('rows').addEventListener('input', recalc);
-  $('invNum').addEventListener('input', ()=>{ $('payComm').textContent = $('invNum').textContent.trim(); });
 
   /* ---------- company persistence ---------- */
   const CO_FIELDS = ['coName','coTag','coAddr','foot'];
@@ -241,38 +239,77 @@ United States</div>
   }
   CO_FIELDS.forEach(id => $(id).addEventListener('blur', saveCompany));
 
-  /* ---------- invoice numbering ---------- */
+  /* ---------- invoice numbering ----------
+     Continues from the highest number in use: looks at the invoice currently
+     on screen plus all saved invoices, takes the biggest trailing number, and
+     adds 1 — keeping the same prefix/padding (2576 -> 2577, INV/2026/00003 ->
+     INV/2026/00004). */
   function nextNumber(){
-    let seq = 1;
-    try{ seq = (parseInt(localStorage.getItem(LS_SEQ)||'0',10)||0) + 1; localStorage.setItem(LS_SEQ, String(seq)); }catch(e){}
-    return 'INV/' + new Date().getFullYear() + '/' + String(seq).padStart(5,'0');
+    let best = null, bestN = -1;
+    const consider = c => {
+      const m = String(c).trim().match(/(\d+)\s*$/);
+      if(m){ const n = parseInt(m[1],10); if(n > bestN){ bestN = n; best = String(c).trim(); } }
+    };
+    consider($('invNum').textContent);
+    Object.keys(docs()).forEach(consider);
+    try{ const s = parseInt(localStorage.getItem(LS_SEQ)||'',10); if(s > bestN){ bestN = s; best = String(s); } }catch(e){}
+    if(best === null) return String(new Date().getFullYear()) + '01';
+    const m = best.match(/(\d+)\s*$/);
+    const next = String(bestN + 1).padStart(m[1].length, '0');
+    try{ localStorage.setItem(LS_SEQ, String(bestN + 1)); }catch(e){}
+    return best.slice(0, m.index) + next;
   }
 
   /* ---------- new / save / load / delete ---------- */
   window.newInvoice = function(fresh){
     const n = nextNumber();
     $('invNum').textContent = n;
-    $('payComm').textContent = n;
     $('mDate').textContent = today();
     $('mDue').textContent = today();
-    $('mSource').textContent = '';
     $('mRef').textContent = '';
     $('customer').textContent = 'Customer Name\nStreet Address\nCity, ST 00000\nUnited States';
     $('notes').textContent = '';
     $('rows').innerHTML = '';
     window.addRow('', '1.00', '0.00');
     $('savedList').value = '';
+    $('custList').value = '';
   };
 
   function docs(){ try{ return JSON.parse(localStorage.getItem(LS_DOCS)||'{}'); }catch(e){ return {}; } }
   function putDocs(d){ try{ localStorage.setItem(LS_DOCS, JSON.stringify(d)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
+
+  /* ---------- customer book ---------- */
+  function custs(){ try{ return JSON.parse(localStorage.getItem(LS_CUST)||'{}'); }catch(e){ return {}; } }
+  function rememberCustomer(){
+    const name = ($('customer').innerText||'').split('\n')[0].trim();
+    if(!name || name.toLowerCase() === 'customer name') return;
+    const c = custs();
+    c[name] = $('customer').innerHTML;
+    try{ localStorage.setItem(LS_CUST, JSON.stringify(c)); }catch(e){}
+    refreshCustList(name);
+  }
+  window.loadCustomer = function(){
+    const key = $('custList').value;
+    if(!key) return;
+    const c = custs()[key];
+    if(c != null) $('customer').innerHTML = c;
+  };
+  function refreshCustList(sel){
+    const c = custs();
+    const s = $('custList');
+    s.innerHTML = '<option value="">— Customers —</option>';
+    Object.keys(c).sort((a,b)=>a.localeCompare(b)).forEach(k=>{
+      const o = document.createElement('option'); o.value = k; o.textContent = k; s.appendChild(o);
+    });
+    s.value = sel || '';
+  }
 
   window.saveInvoice = function(){
     const key = $('invNum').textContent.trim() || nextNumber();
     const d = docs();
     d[key] = {
       inv:key, date:$('mDate').textContent, due:$('mDue').textContent,
-      source:$('mSource').textContent, ref:$('mRef').textContent,
+      ref:$('mRef').textContent,
       customer:$('customer').innerHTML, notes:$('notes').innerHTML,
       rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
         desc: tr.querySelector('.c-desc').textContent,
@@ -282,6 +319,7 @@ United States</div>
     };
     putDocs(d);
     refreshList(key);
+    rememberCustomer();
   };
 
   window.loadSelected = function(){
@@ -289,9 +327,9 @@ United States</div>
     if(!key) return;
     const rec = docs()[key];
     if(!rec) return;
-    $('invNum').textContent = rec.inv; $('payComm').textContent = rec.inv;
+    $('invNum').textContent = rec.inv;
     $('mDate').textContent = rec.date||''; $('mDue').textContent = rec.due||'';
-    $('mSource').textContent = rec.source||''; $('mRef').textContent = rec.ref||'';
+    $('mRef').textContent = rec.ref||'';
     $('customer').innerHTML = rec.customer||''; $('notes').innerHTML = rec.notes||'';
     $('rows').innerHTML = '';
     (rec.rows&&rec.rows.length?rec.rows:[{desc:'',qty:'1.00',price:'0.00'}])
@@ -322,11 +360,10 @@ United States</div>
   /* ---------- init ---------- */
   loadCompany();
   refreshList('');
+  refreshCustList('');
   $('mDate').textContent = today();
   $('mDue').textContent = today();
   window.addRow('Technical Support', '1.00', '100.00');
-  const n0 = $('invNum').textContent.trim();
-  $('payComm').textContent = n0;
 })();
 </script>
 </body>
