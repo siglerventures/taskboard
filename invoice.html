@@ -1,11 +1,112 @@
 <!DOCTYPE html>
-<!-- Simple Invoicing v1.11 -->
+<!-- Accounting (Simple Invoicing) v2.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Accounting</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧾</text></svg>">
+<script type="module">
+// ── Google sign-in, same access model and ROSTER as the Task Board ──
+// Users are resolved against taskboard/access/{emailKey}, so anyone who can
+// sign in to the Task Board can sign in here — one roster for both apps.
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCrW9Lrf7fWVqRxKqsnuPK0tL6UYbd_qds",
+  authDomain: "philinity-893d2.firebaseapp.com",
+  databaseURL: "https://philinity-893d2-default-rtdb.firebaseio.com",
+  projectId: "philinity-893d2",
+  storageBucket: "philinity-893d2.firebasestorage.app",
+  messagingSenderId: "443020781676",
+  appId: "1:443020781676:web:614ec91c9ba33076eb9049"
+};
+
+// Both root UIDs are always-admin and lockout-proof (Phil + Trinity),
+// identical to the Task Board.
+const ROOT_ADMIN_UIDS = ['CuJigrzCbRfFFsM7uqe0mix46xH3', 'g4stabGPKiWAE23NTw6oUsqawWf1'];
+const VALID_ROLES = ['admin', 'moderator', 'user'];
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const auth = getAuth(app);
+
+// Email → RTDB key. MUST match the Task Board / security-rules transform.
+function emailToKey(email) {
+  if (!email) return '';
+  return email
+    .toLowerCase()
+    .trim()
+    .replace(/\./g, '_')
+    .replace(/#/g, '_HASH_')
+    .replace(/\$/g, '_DOL_')
+    .replace(/\[/g, '_OB_')
+    .replace(/\]/g, '_CB_')
+    .replace(/\//g, '_FS_');
+}
+window.emailToKey = emailToKey;
+
+window.SV_ROLE = null;
+window.SV_EMAIL = null;
+
+async function resolveAccess(user) {
+  if (ROOT_ADMIN_UIDS.includes(user.uid)) return { role: 'admin' };
+  try {
+    const key = emailToKey(user.email || '');
+    if (!key) return null;
+    const snap = await get(ref(db, 'taskboard/access/' + key));
+    const rec = snap.val();
+    if (rec && VALID_ROLES.includes(rec.role)) return { role: rec.role };
+  } catch (e) {
+    console.error('Access resolution failed:', e);
+  }
+  return null;
+}
+
+window.googleSignIn = async function() {
+  try {
+    const provider = new GoogleAuthProvider();
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    console.error('Sign-in failed:', e);
+    const err = document.getElementById('pw-error');
+    if (err) { err.style.display = 'block'; err.textContent = 'Sign-in failed. Please try again.'; }
+  }
+};
+
+window.doSignOut = async function() {
+  await signOut(auth);
+  location.reload();
+};
+
+window._fbSet = set;
+window._fbGet = get;
+window._fbRefFn = ref;
+window._fbDb = db;
+window._fbAuth = auth;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    document.getElementById('auth-gate').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    return;
+  }
+  const access = await resolveAccess(user);
+  if (!access) {
+    const err = document.getElementById('pw-error');
+    if (err) { err.style.display = 'block'; err.textContent = 'This Google account is not authorized.'; }
+    await signOut(auth);
+    return;
+  }
+  window.SV_ROLE = access.role;
+  window.SV_EMAIL = user.email || '';
+  document.getElementById('auth-gate').style.display = 'none';
+  document.body.style.overflow = '';
+  if (typeof window.applyRoleToUI === 'function') window.applyRoleToUI();
+});
+</script>
 <style>
   :root{
     --purple:#5b3df5;
@@ -207,6 +308,18 @@
 </head>
 <body>
 
+<!-- PASSWORD GATE — identical model to the Task Board -->
+<div id="auth-gate" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:20px;box-sizing:border-box">
+  <div style="background:#1e293b;border-radius:16px;padding:32px 28px;width:100%;max-width:360px;box-shadow:0 4px 24px rgba(0,0,0,0.4);display:flex;flex-direction:column;align-items:center;gap:14px;box-sizing:border-box;border:0.5px solid #334155;">
+    <div style="font-size:40px;line-height:1">🧾</div>
+    <div style="font-size:22px;font-weight:700;color:#e2e8f0;text-align:center">Accounting</div>
+    <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
+    <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
+    <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center"></div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 2.0</div>
+  </div>
+</div>
+
 <div class="toolbar">
   <a class="brand" href="#" title="Back to a fresh invoice" onclick="window.goHome(); return false;">🏚️ Main</a>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
@@ -355,6 +468,73 @@ United States</div>
   <button onclick="window.ctxAddLine()">＋ Add line below</button>
   <button class="danger" onclick="window.ctxRemoveLine()">✕ Remove line</button>
 </div>
+
+<!-- DATA MODAL (admin only) -->
+<div id="sv-data-modal" class="noprint" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="background:#1e293b;border-radius:16px;width:100%;max-width:500px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155;color:#e2e8f0">
+    <button onclick="closeDataModal()" style="position:absolute;top:14px;right:14px;background:#0f172a;border:0.5px solid #334155;color:#94a3b8;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">📦 Data Manager</div>
+    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Backup · Export · Restore</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:3px">🌐 Full Backup (HTML)</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Save the whole app as one HTML file — keeps the exact look &amp; flow.</div>
+        <button onclick="svBackupHTML()" style="background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download HTML Backup</button>
+      </div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:3px">📦 Full Backup (JSON)</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Download all invoices, customers, items, and expenses</div>
+        <button onclick="svBackupJSON()" style="background:#334155;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download Backup</button>
+      </div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:3px">📊 Export Invoices as CSV</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">All invoices with totals, tax, and paid status — opens in Excel or Google Sheets</div>
+        <button onclick="svExportCSV()" style="background:#334155;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download CSV</button>
+      </div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:3px">♻️ Restore from Backup</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:10px">Select an accounting-backup-*.json file to restore</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="background:#334155;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">
+            📂 Choose Backup File
+            <input type="file" accept=".json" style="display:none" onchange="svRestore(event)">
+          </label>
+          <span id="sv-restore-filename" style="font-size:11px;color:#64748b;font-family:monospace">No file selected</span>
+        </div>
+      </div>
+    </div>
+    <div id="sv-data-status" style="margin-top:14px;font-size:12px;color:#94a3b8;font-family:monospace;line-height:1.8"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid #334155">
+      <button onclick="closeDataModal()" style="background:#0f172a;color:#94a3b8;border:0.5px solid #334155;padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- MANAGE ACCESS MODAL (admin only) — shared roster with the Task Board -->
+<div id="sv-access-modal" class="noprint" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
+  <div style="background:#1e293b;border-radius:16px;width:100%;max-width:520px;padding:28px;position:relative;box-shadow:0 20px 60px rgba(0,0,0,0.5);border:0.5px solid #334155;color:#e2e8f0">
+    <button onclick="closeAccessModal()" style="position:absolute;top:14px;right:14px;background:#0f172a;border:0.5px solid #334155;color:#94a3b8;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:15px">✕</button>
+    <div style="font-size:20px;font-weight:700;margin-bottom:4px">👥 People &amp; Access</div>
+    <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Who can sign in · shared with Task Board</div>
+    <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px">Add / update person</div>
+      <input id="sv-acc-email" type="email" placeholder="name@example.com" autocomplete="off" style="width:100%;padding:8px 10px;border:0.5px solid #334155;border-radius:8px;font-size:13px;background:#1e293b;color:#e2e8f0;box-sizing:border-box" />
+      <select id="sv-acc-role" style="width:100%;margin-top:8px;padding:8px 10px;border:0.5px solid #334155;border-radius:8px;font-size:13px;background:#1e293b;color:#e2e8f0">
+        <option value="admin">Admin — full access + Data Manager + roster</option>
+        <option value="moderator">Moderator — everything except Data &amp; People</option>
+        <option value="user" selected>User — sign-in access</option>
+      </select>
+      <button onclick="addAccessEntry()" style="margin-top:10px;background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ Add / Update</button>
+    </div>
+    <div id="sv-acc-status" style="font-size:12px;margin-bottom:10px;min-height:16px"></div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px">Current access</div>
+    <div id="sv-acc-list" style="display:flex;flex-direction:column;gap:6px"></div>
+    <div style="font-size:11px;color:#475569;margin-top:14px;line-height:1.6">This is the SAME roster the Task Board uses (taskboard/access) — adding or removing someone here affects both apps. Root admins (Phil &amp; Trinity) always have admin access and aren't listed. A user's Task Board person mapping is kept when you update their role here.</div>
+  </div>
+</div>
+
+<!-- page footer — matches the Task Board footer -->
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:#334155"><span id="sv-version">v2.0</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:#475569">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -940,6 +1120,185 @@ United States</div>
   window.toggleReport = function(){ setReport(!document.body.classList.contains('reporting')); };
 
   window.doPrint = function(){ document.activeElement && document.activeElement.blur(); window.print(); };
+
+  /* ---------- auth-aware footer ---------- */
+  const escapeHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  window.applyRoleToUI = function(){
+    const isAdmin = window.SV_ROLE === 'admin';
+    $('sv-data-link').style.display = isAdmin ? 'inline' : 'none';
+    $('sv-access-link').style.display = isAdmin ? 'inline' : 'none';
+    const pill = $('sv-user-pill');
+    const user = window._fbAuth && window._fbAuth.currentUser;
+    if(pill && user){
+      const name = escapeHtml(user.displayName || user.email || 'User');
+      const photo = (user.photoURL || '').replace(/"/g, '%22');
+      const avatar = photo
+        ? '<img src="' + photo + '" alt="" style="width:14px;height:14px;border-radius:50%;vertical-align:middle;margin-right:4px">'
+        : '';
+      pill.innerHTML = '· ' + avatar + '<span>' + name + '</span>'
+        + (isAdmin ? ' <span style="color:#f59e0b">★</span>' : '');
+      pill.style.display = 'inline';
+    }
+  };
+  window.footerHistory = function(){
+    if(!document.body.classList.contains('reporting')) window.toggleReport();
+    window.scrollTo({top:0, behavior:'smooth'});
+  };
+
+  /* ---------- data manager (admin only) ---------- */
+  const SV_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp'];
+  window.openDataModal = function(){
+    if(window.SV_ROLE !== 'admin'){ alert('Admin only'); return; }
+    $('sv-data-status').textContent = '';
+    $('sv-restore-filename').textContent = 'No file selected';
+    $('sv-data-modal').style.display = 'flex';
+  };
+  window.closeDataModal = function(){ $('sv-data-modal').style.display = 'none'; };
+  function download(name, content, type){
+    const blob = new Blob([content], { type: type });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+    return name;
+  }
+  const stamp = () => new Date().toISOString().slice(0,10);
+  // One self-contained HTML file: the app as it stands, with a seed script in
+  // <head> that loads today's data into localStorage when the file is opened
+  // (only into empty keys, so it never clobbers live data on this site).
+  window.svBackupHTML = function(){
+    const status = $('sv-data-status');
+    try{
+      const data = {};
+      SV_KEYS.forEach(k=>{ const v = localStorage.getItem(k); if(v != null) data[k] = v; });
+      const seed = '<scr'+'ipt id="sv-seed">(function(){try{var d=' +
+        JSON.stringify(JSON.stringify(data)) +
+        ';d=JSON.parse(d);for(var k in d){if(localStorage.getItem(k)==null)localStorage.setItem(k,d[k]);}}catch(e){}})();</scr'+'ipt>';
+      let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+      html = html.replace(/<script id="sv-seed">[\s\S]*?<\/script>/, ''); // don't stack seeds on re-backup
+      html = html.replace(/<head>/i, '<head>' + seed);
+      const name = download('accounting-backup-' + stamp() + '.html', html, 'text/html');
+      status.innerHTML = '<span style="color:#4ade80">✅ HTML backup saved: ' + name + '</span>';
+    }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
+  };
+  window.svBackupJSON = function(){
+    const status = $('sv-data-status');
+    try{
+      const backup = { app:'accounting', version:'2.0', exportedAt:new Date().toISOString(), data:{} };
+      SV_KEYS.forEach(k=>{ const v = localStorage.getItem(k); if(v != null) backup.data[k] = v; });
+      const name = download('accounting-backup-' + stamp() + '.json', JSON.stringify(backup, null, 2), 'application/json');
+      status.innerHTML = '<span style="color:#4ade80">✅ Backup saved: ' + name + '</span>';
+    }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
+  };
+  window.svExportCSV = function(){
+    const status = $('sv-data-status');
+    try{
+      const q = s => '"' + String(s==null?'':s).replace(/"/g,'""') + '"';
+      const rows = ['Invoice,Customer,Date,Due,Total,Tax,Paid,Paid Date'];
+      const d = docs();
+      Object.keys(d).sort().forEach(k=>{
+        const r = d[k]; const t = docTotals(r);
+        rows.push([q(k), q(docCustomer(r)), q(r.date||''), q(r.due||''), t.total.toFixed(2), t.tax.toFixed(2), r.paid?'yes':'no', q(r.paidDate||'')].join(','));
+      });
+      const name = download('accounting-invoices-' + stamp() + '.csv', rows.join('\n'), 'text/csv');
+      status.innerHTML = '<span style="color:#4ade80">✅ CSV saved: ' + name + '</span>';
+    }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
+  };
+  window.svRestore = function(ev){
+    const status = $('sv-data-status');
+    const file = ev.target.files && ev.target.files[0];
+    if(!file) return;
+    $('sv-restore-filename').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = function(){
+      try{
+        const backup = JSON.parse(reader.result);
+        if(!backup || backup.app !== 'accounting' || !backup.data) throw new Error('Not an accounting backup file');
+        if(!confirm('Restore backup from ' + (backup.exportedAt||'unknown date') + '? This replaces the data on this device.')) return;
+        SV_KEYS.forEach(k=>{
+          if(backup.data[k] != null) localStorage.setItem(k, backup.data[k]);
+          else localStorage.removeItem(k);
+        });
+        status.innerHTML = '<span style="color:#4ade80">✅ Restored — reloading…</span>';
+        setTimeout(()=>location.reload(), 600);
+      }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ ' + escapeHtml(e.message) + '</span>'; }
+    };
+    reader.readAsText(file);
+  };
+
+  /* ---------- people & access (admin only, shared roster) ---------- */
+  window.openAccessModal = function(){
+    if(window.SV_ROLE !== 'admin'){ alert('Admin only'); return; }
+    $('sv-acc-email').value = '';
+    $('sv-acc-role').value = 'user';
+    $('sv-acc-status').textContent = '';
+    $('sv-access-modal').style.display = 'flex';
+    renderAccessList();
+  };
+  window.closeAccessModal = function(){ $('sv-access-modal').style.display = 'none'; };
+  window.addAccessEntry = async function(){
+    if(window.SV_ROLE !== 'admin') return;
+    const status = $('sv-acc-status');
+    const email = ($('sv-acc-email').value || '').trim().toLowerCase();
+    const role = $('sv-acc-role').value;
+    if(!email || email.indexOf('@') < 1 || email.indexOf('.', email.indexOf('@')) < 0){
+      status.innerHTML = '<span style="color:#f87171">Enter a valid email address.</span>'; return;
+    }
+    if(!window.emailToKey || !window._fbSet){ status.innerHTML = '<span style="color:#f87171">Not connected.</span>'; return; }
+    const key = window.emailToKey(email);
+    try{
+      // Merge with any existing record so the Task Board's person mapping survives.
+      const snap = await window._fbGet(window._fbRefFn(window._fbDb, 'taskboard/access/' + key));
+      const prev = snap.val() || {};
+      const rec = Object.assign({}, prev, { email, role, name: prev.name || email.split('@')[0], addedAt: prev.addedAt || new Date().toISOString(), addedBy: prev.addedBy || window.SV_EMAIL || '' });
+      await window._fbSet(window._fbRefFn(window._fbDb, 'taskboard/access/' + key), rec);
+      status.innerHTML = '<span style="color:#4ade80">Saved ' + escapeHtml(email) + ' as ' + escapeHtml(role) + ' ✓</span>';
+      $('sv-acc-email').value = '';
+      renderAccessList();
+    }catch(e){
+      status.innerHTML = '<span style="color:#f87171">Error: ' + escapeHtml(e.code || e.message || 'failed') + '</span>';
+    }
+  };
+  async function renderAccessList(){
+    const list = $('sv-acc-list');
+    list.innerHTML = '<div style="color:#475569;font-size:12px">Loading…</div>';
+    try{
+      const snap = await window._fbGet(window._fbRefFn(window._fbDb, 'taskboard/access'));
+      const data = snap.val() || {};
+      const keys = Object.keys(data);
+      if(!keys.length){
+        list.innerHTML = '<div style="color:#475569;font-size:12px">No one added yet. Root admins always have access.</div>'; return;
+      }
+      list.innerHTML = keys.map(k=>{
+        const r = data[k] || {};
+        const color = r.role === 'admin' ? '#a78bfa' : (r.role === 'moderator' ? '#38bdf8' : '#94a3b8');
+        return '<div style="display:flex;align-items:center;gap:8px;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:8px 10px">'
+          + '<div style="flex:1;min-width:0">'
+          + '<div style="font-size:13px;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(r.email || k) + '</div>'
+          + '<div style="font-size:11px;color:' + color + '">' + escapeHtml(r.role || '?') + (r.person ? ' · 👤 ' + escapeHtml(r.person) : '') + '</div>'
+          + '</div>'
+          + '<button data-acc-key="' + escapeHtml(k) + '" data-acc-email="' + escapeHtml(r.email || k) + '" style="background:#1c0a0a;border:0.5px solid #7f1d1d;color:#f87171;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer">Remove</button>'
+          + '</div>';
+      }).join('');
+      list.querySelectorAll('button[data-acc-key]').forEach(btn=>{
+        btn.addEventListener('click', ()=>removeAccessEntry(btn.dataset.accKey, btn.dataset.accEmail));
+      });
+    }catch(e){
+      list.innerHTML = '<div style="color:#f87171;font-size:12px">Could not load roster: ' + escapeHtml(e.code || e.message || 'error') + '</div>';
+    }
+  }
+  async function removeAccessEntry(key, email){
+    if(window.SV_ROLE !== 'admin') return;
+    if(!confirm('Remove access for ' + email + '? This also removes their Task Board access.')) return;
+    try{
+      await window._fbSet(window._fbRefFn(window._fbDb, 'taskboard/access/' + key), null);
+      renderAccessList();
+    }catch(e){
+      $('sv-acc-status').innerHTML = '<span style="color:#f87171">Error: ' + escapeHtml(e.code || e.message || 'failed') + '</span>';
+    }
+  }
+  if(window.SV_ROLE) window.applyRoleToUI(); // auth may have resolved before this script ran
 
   /* ---------- init ---------- */
   loadCompany();
