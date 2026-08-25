@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.4</title>
+<title>Simple Invoicing v1.5</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -13,6 +13,8 @@
     --muted:#6b7280;
     --line:#e5e7eb;
     --band:#f0edfa;
+    --green:#1a9c4b;
+    --red:#c0392b;
   }
   *{ box-sizing:border-box; }
   html,body{ margin:0; padding:0; background:#eceef2; color:var(--ink);
@@ -25,13 +27,13 @@
     padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
   }
   .toolbar .brand{ font-weight:700; color:var(--purple); margin-right:auto; }
-  .toolbar button, .toolbar select{
+  .toolbar button, .toolbar select, .modal button{
     font:inherit; font-size:14px; padding:8px 14px; border-radius:8px;
     border:1px solid var(--line); background:#fff; cursor:pointer;
   }
-  .toolbar button:hover{ background:#f6f5fc; }
-  .toolbar button.primary{ background:var(--purple); border-color:var(--purple); color:#fff; }
-  .toolbar button.primary:hover{ background:var(--purple-dark); }
+  .toolbar button:hover, .modal button:hover{ background:#f6f5fc; }
+  .toolbar button.primary, .modal button.primary{ background:var(--purple); border-color:var(--purple); color:#fff; }
+  .toolbar button.primary:hover, .modal button.primary:hover{ background:var(--purple-dark); }
   .toolbar select{ max-width:230px; }
   .hint{ font-size:12px; color:var(--muted); padding:6px 16px 0; text-align:center; }
 
@@ -78,13 +80,24 @@
   table.items td{ padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
   table.items tbody tr:nth-child(odd) td{ background:var(--band); }
   table.items td[contenteditable]{ outline:none; }
+  td.c-item input{
+    font:inherit; width:100%; border:none; background:transparent; outline:none; padding:0;
+  }
+  td.c-item input:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
+  td.c-item input:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
   td.del{ width:26px; text-align:center; border-bottom:1px solid var(--line); background:#fff !important; }
   td.del button{ border:none; background:none; color:#c33; cursor:pointer; font-size:15px; visibility:hidden; }
   tr:hover td.del button{ visibility:visible; }
 
   .notes{ font-style:italic; font-size:13.5px; margin:14px 2px 0; outline:none; min-height:18px; }
 
-  .bottom{ display:flex; justify-content:flex-end; align-items:flex-start; margin-top:26px; gap:20px; }
+  .bottom{ display:flex; justify-content:space-between; align-items:center; margin-top:26px; gap:20px; }
+  .paid-stamp{
+    display:none; border:3px solid var(--green); color:var(--green);
+    font-weight:800; font-size:24px; letter-spacing:3px; padding:5px 18px;
+    border-radius:8px; transform:rotate(-8deg);
+  }
+  .sheet.paid .paid-stamp{ display:inline-block; }
   .totals{ min-width:280px; }
   .totals .trow{ display:flex; justify-content:space-between; padding:8px 12px; font-size:14.5px; }
   .totals .grand{ border-top:2px solid var(--ink); font-weight:700; color:var(--purple); font-size:16px; }
@@ -95,14 +108,60 @@
   [contenteditable]:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
   [contenteditable]:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
 
+  /* ---------- items & tax modal ---------- */
+  .modal-bg{
+    display:none; position:fixed; inset:0; background:rgba(20,16,40,.45);
+    z-index:100; align-items:flex-start; justify-content:center; padding:40px 16px;
+  }
+  .modal-bg.open{ display:flex; }
+  .modal{
+    background:#fff; border-radius:12px; padding:22px; width:640px; max-width:96vw;
+    max-height:86vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3);
+  }
+  .modal h2{ margin:0 0 14px; color:var(--purple); font-size:19px; }
+  .modal table{ width:100%; border-collapse:collapse; font-size:14px; }
+  .modal th{ text-align:left; padding:6px 8px; border-bottom:2px solid var(--ink); font-size:13px; }
+  .modal td{ padding:6px 8px; border-bottom:1px solid var(--line); }
+  .modal input[type=text], .modal input[type=number]{
+    font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; width:100%;
+  }
+  .modal input[type=checkbox]{ width:17px; height:17px; }
+  .modal .rowbtns{ margin-top:14px; display:flex; gap:8px; justify-content:flex-end; }
+  .modal .taxline{ margin:0 0 14px; font-size:14px; }
+  .modal .taxline input{ width:90px; }
+  .modal .mnote{ font-size:12.5px; color:var(--muted); margin-top:10px; }
+
+  /* ---------- report view ---------- */
+  .sheet.report{ display:none; padding:34px 40px 40px; }
+  body.reporting .sheet.inv{ display:none; }
+  body.reporting .sheet.report{ display:flex; }
+  .report h1{ color:var(--purple); font-weight:600; font-size:28px; margin:0 0 2px; }
+  .report .rsub{ color:var(--muted); font-size:13.5px; margin-bottom:18px; }
+  .rtiles{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px; }
+  .rtile{ background:var(--band); border-radius:8px; padding:12px 14px; }
+  .rtile .k{ font-size:12px; color:var(--muted); }
+  .rtile .v{ font-size:19px; font-weight:700; color:var(--purple); margin-top:4px; }
+  .rtile.good .v{ color:var(--green); }
+  .rtile.bad .v{ color:var(--red); }
+  table.rtab{ width:100%; border-collapse:collapse; font-size:14px; }
+  table.rtab th{ text-align:left; padding:8px 10px; border-bottom:2px solid var(--ink); font-weight:600; }
+  table.rtab td{ padding:8px 10px; border-bottom:1px solid var(--line); }
+  table.rtab th.num, table.rtab td.num{ text-align:right; }
+  table.rtab tbody tr:nth-child(odd) td{ background:var(--band); }
+  .st-paid{ color:var(--green); font-weight:700; }
+  .st-unpaid{ color:var(--red); font-weight:700; }
+  .report .pl{ margin-top:22px; font-size:13px; color:var(--muted); }
+
   /* ---------- print ---------- */
   @media print{
     @page{ size:letter; margin:0; }
     body{ background:#fff; }
-    .toolbar, .hint, td.del, .noprint{ display:none !important; }
+    .toolbar, .hint, td.del, .noprint, .modal-bg{ display:none !important; }
     .sheet{ box-shadow:none; margin:0; width:auto; min-height:0; }
     [contenteditable]:hover, [contenteditable]:focus{ background:transparent; box-shadow:none; }
-    table.items tbody tr:nth-child(odd) td, .meta{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    td.c-item input:hover, td.c-item input:focus{ background:transparent; box-shadow:none; }
+    table.items tbody tr:nth-child(odd) td, .meta, .rtile,
+    table.rtab tbody tr:nth-child(odd) td{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
 </head>
@@ -114,13 +173,16 @@
   <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
   <button onclick="window.addRow()">＋ Add Line</button>
-  <button onclick="window.saveInvoice()">💾 Save</button>
+  <button onclick="window.openItems()">🏷 Items</button>
+  <button onclick="window.saveInvoice(); return false;">💾 Save</button>
+  <button id="paidBtn" onclick="window.togglePaid()">💰 Mark Paid</button>
   <button onclick="window.deleteInvoice()">🗑 Delete</button>
+  <button id="reportBtn" onclick="window.toggleReport()">📊 Report</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. 💾 Save keeps the invoice and remembers the customer (pick past customers from the Customers list). 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
 
-<div class="sheet">
+<div class="sheet inv" id="invSheet">
   <div class="head">
     <div class="row">
       <div>
@@ -148,7 +210,7 @@ Street Address
 City, ST 00000
 United States</div>
 
-    <h1 class="invnum">Invoice <span id="invNum" contenteditable="true">INV/2026/00001</span></h1>
+    <h1 class="invnum">Invoice <span id="invNum" contenteditable="true">1000</span></h1>
 
     <div class="meta">
       <div><div class="k">Invoice Date</div><div class="v" id="mDate" contenteditable="true"></div></div>
@@ -159,9 +221,10 @@ United States</div>
     <table class="items">
       <thead>
         <tr>
-          <th style="width:46%">Description</th>
-          <th class="qty" style="width:16%">Quantity</th>
-          <th class="num" style="width:18%">Unit Price</th>
+          <th style="width:22%">Item</th>
+          <th style="width:28%">Description</th>
+          <th class="qty" style="width:11%">Quantity</th>
+          <th class="num" style="width:19%">Unit Price</th>
           <th class="num" style="width:20%">Amount</th>
           <th class="del noprint"></th>
         </tr>
@@ -169,10 +232,13 @@ United States</div>
       <tbody id="rows"></tbody>
     </table>
 
-    <div class="notes" id="notes" contenteditable="true">"Campground Master" RV Software Setup for additional user and Remote Connection.</div>
+    <div class="notes" id="notes" contenteditable="true"></div>
 
     <div class="bottom">
+      <div><span class="paid-stamp" id="paidStamp">PAID</span></div>
       <div class="totals">
+        <div class="trow" id="subRow" style="display:none"><span>Subtotal</span><span id="subT">$ 0.00</span></div>
+        <div class="trow" id="taxRow" style="display:none"><span id="taxLbl">Sales Tax</span><span id="taxT">$ 0.00</span></div>
         <div class="trow grand"><span>Total</span><span class="amt" id="grand">$ 0.00</span></div>
       </div>
     </div>
@@ -181,12 +247,56 @@ United States</div>
   <div class="foot" id="foot" contenteditable="true">Thank you for your business!</div>
 </div>
 
+<!-- report view (shown by 📊 Report, printable) -->
+<div class="sheet report" id="reportSheet">
+  <div class="body" style="padding:0">
+    <h1>Invoice Report</h1>
+    <div class="rsub" id="rsub"></div>
+    <div class="rtiles">
+      <div class="rtile"><div class="k">Total Invoiced</div><div class="v" id="rInvoiced">$ 0.00</div></div>
+      <div class="rtile good"><div class="k">Collected (Paid)</div><div class="v" id="rPaid">$ 0.00</div></div>
+      <div class="rtile bad"><div class="k">Outstanding (Unpaid)</div><div class="v" id="rDue">$ 0.00</div></div>
+      <div class="rtile"><div class="k">Sales Tax Collected</div><div class="v" id="rTax">$ 0.00</div></div>
+    </div>
+    <table class="rtab">
+      <thead><tr>
+        <th>Invoice</th><th>Customer</th><th>Date</th>
+        <th class="num">Total</th><th class="num">Tax</th><th>Status</th>
+      </tr></thead>
+      <tbody id="rRows"></tbody>
+    </table>
+    <div class="pl">P&amp;L (cash basis): income received = Collected above. Sales tax collected is money you owe the state, not income.</div>
+  </div>
+</div>
+
+<!-- items & sales tax editor -->
+<div class="modal-bg noprint" id="itemsModal">
+  <div class="modal">
+    <h2>🏷 Items &amp; Sales Tax</h2>
+    <div class="taxline">Sales tax rate: <input type="number" id="taxRateIn" step="0.01" min="0"> %</div>
+    <table>
+      <thead><tr><th>Item</th><th style="width:130px">Unit Price</th><th style="width:60px">Taxed</th><th style="width:36px"></th></tr></thead>
+      <tbody id="itemRows"></tbody>
+    </table>
+    <div class="rowbtns">
+      <button onclick="window.addItemRow()">＋ Add Item</button>
+      <button class="primary" onclick="window.saveItems()">Save</button>
+      <button onclick="window.closeItems()">Close</button>
+    </div>
+    <div class="mnote">Items appear as suggestions in the invoice's Item column and fill in their price automatically. "Taxed" items get sales tax added on the invoice. New item names you type on invoices are added here when you save the invoice.</div>
+  </div>
+</div>
+
+<datalist id="itemsDL"></datalist>
+
 <script>
 (function(){
-  const LS_CO   = 'sinv_company';
-  const LS_SEQ  = 'sinv_seq';
-  const LS_DOCS = 'sinv_docs';
-  const LS_CUST = 'sinv_custs';
+  const LS_CO    = 'sinv_company';
+  const LS_SEQ   = 'sinv_seq';
+  const LS_DOCS  = 'sinv_docs';
+  const LS_CUST  = 'sinv_custs';
+  const LS_ITEMS = 'sinv_items';
+  const LS_SET   = 'sinv_set';
 
   const $ = id => document.getElementById(id);
   const money = n => '$ ' + (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
@@ -195,44 +305,82 @@ United States</div>
   const fmtQty = s => { const t = String(s==null?'':s).trim(); return /^[0-9.,\s]+$/.test(t) && t !== '' ? String(num(t)) : t; };
   const today = () => { const d=new Date(); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+'/'+d.getFullYear(); };
 
+  function lsGet(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)||'null') || fallback; }catch(e){ return fallback; } }
+  function lsPut(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
+
+  const docs     = () => lsGet(LS_DOCS, {});
+  const custs    = () => lsGet(LS_CUST, {});
+  const itemBook = () => lsGet(LS_ITEMS, {});
+  const settings = () => lsGet(LS_SET, {});
+  const taxRate  = () => { const r = parseFloat(settings().taxRate); return isFinite(r) && r > 0 ? r : 0; };
+
   /* ---------- rows ---------- */
-  function rowHtml(desc, qty, price){
+  function rowHtml(item, desc, qty, price, taxable){
     const tr = document.createElement('tr');
     tr.innerHTML =
+      '<td class="c-item"><input list="itemsDL" autocomplete="off"></td>'+
       '<td contenteditable="true" class="c-desc"></td>'+
       '<td contenteditable="true" class="c-qty"></td>'+
       '<td contenteditable="true" class="num c-price"></td>'+
       '<td class="num c-amt">$ 0.00</td>'+
       '<td class="del noprint"><button title="Remove line" onclick="this.closest(\'tr\').remove(); window.recalc()">✕</button></td>';
+    tr.querySelector('.c-item input').value = item || '';
     tr.querySelector('.c-desc').textContent  = desc  || '';
     tr.querySelector('.c-qty').textContent   = fmtQty(qty || '1');
-    tr.querySelector('.c-price').textContent = price || '0.00';
+    tr.querySelector('.c-price').textContent = money(num(price || 0));
+    tr.dataset.taxable = taxable ? '1' : '';
     return tr;
   }
 
-  window.addRow = function(desc, qty, price){
-    $('rows').appendChild(rowHtml(desc, qty, price));
+  window.addRow = function(item, desc, qty, price, taxable){
+    $('rows').appendChild(rowHtml(item, desc, qty, price, taxable));
     recalc();
   };
 
   window.recalc = recalc;
-  function recalc(){
-    let total = 0;
+  function computeTotals(){
+    let sub = 0, taxBase = 0;
     $('rows').querySelectorAll('tr').forEach(tr=>{
       const amt = num(tr.querySelector('.c-qty').textContent) * num(tr.querySelector('.c-price').textContent);
       tr.querySelector('.c-amt').textContent = money(amt);
-      total += amt;
+      sub += amt;
+      if(tr.dataset.taxable === '1') taxBase += amt;
     });
-    $('grand').textContent = money(total);
+    const rate = taxRate();
+    const tax = Math.round(taxBase * rate) / 100; // rate is in %, round to cents
+    return { sub: sub, tax: tax, total: sub + tax, rate: rate };
+  }
+  function recalc(){
+    const t = computeTotals();
+    const showTax = t.tax > 0;
+    $('subRow').style.display = showTax ? '' : 'none';
+    $('taxRow').style.display = showTax ? '' : 'none';
+    $('subT').textContent = money(t.sub);
+    $('taxLbl').textContent = 'Sales Tax (' + t.rate + '%)';
+    $('taxT').textContent = money(t.tax);
+    $('grand').textContent = money(t.total);
   }
   $('rows').addEventListener('input', recalc);
-  // tidy quantities when you click away: 5.00 -> 5, but 5.25 stays 5.25
+  // picking or typing a known item fills its price and tax setting
+  $('rows').addEventListener('change', e=>{
+    if(!(e.target instanceof HTMLInputElement)) return;
+    const tr = e.target.closest('tr');
+    const it = itemBook()[e.target.value.trim()];
+    if(tr && it){
+      tr.querySelector('.c-price').textContent = money(num(it.price));
+      tr.dataset.taxable = it.taxable ? '1' : '';
+      const d = tr.querySelector('.c-desc');
+      if(!d.textContent.trim() && it.desc) d.textContent = it.desc;
+    }
+    recalc();
+  });
+  // tidy quantities and prices when you click away: 5.00 -> 5, price -> $ 125.00
   $('rows').addEventListener('focusout', e=>{
-    const td = e.target && e.target.closest ? e.target.closest('.c-qty') : null;
-    if(!td) return;
-    const t = td.textContent.trim();
-    const f = fmtQty(t);
-    if(f !== t) td.textContent = f;
+    if(!e.target || !e.target.closest) return;
+    const q = e.target.closest('.c-qty');
+    if(q){ const f = fmtQty(q.textContent.trim()); if(f !== q.textContent) q.textContent = f; recalc(); return; }
+    const p = e.target.closest('.c-price');
+    if(p){ const t = p.textContent.trim(); if(t !== '' && num(t) >= 0) p.textContent = money(num(t)); recalc(); }
   });
 
   /* ---------- company persistence ---------- */
@@ -240,21 +388,17 @@ United States</div>
   function saveCompany(){
     const o = {};
     CO_FIELDS.forEach(id => o[id] = $(id).innerHTML);
-    try{ localStorage.setItem(LS_CO, JSON.stringify(o)); }catch(e){}
+    lsPut(LS_CO, o);
   }
   function loadCompany(){
-    try{
-      const o = JSON.parse(localStorage.getItem(LS_CO)||'null');
-      if(o) CO_FIELDS.forEach(id => { if(o[id]!=null) $(id).innerHTML = o[id]; });
-    }catch(e){}
+    const o = lsGet(LS_CO, null);
+    if(o) CO_FIELDS.forEach(id => { if(o[id]!=null) $(id).innerHTML = o[id]; });
   }
   CO_FIELDS.forEach(id => $(id).addEventListener('blur', saveCompany));
 
   /* ---------- invoice numbering ----------
-     Continues from the highest number in use: looks at the invoice currently
-     on screen plus all saved invoices, takes the biggest trailing number, and
-     adds 1 — keeping the same prefix/padding (2576 -> 2577, INV/2026/00003 ->
-     INV/2026/00004). */
+     Continues from the highest number in use: current invoice, saved
+     invoices, and the stored counter — keeping the same prefix/padding. */
   function nextNumber(){
     let best = null, bestN = -1;
     const consider = c => {
@@ -264,40 +408,25 @@ United States</div>
     consider($('invNum').textContent);
     Object.keys(docs()).forEach(consider);
     try{ const s = parseInt(localStorage.getItem(LS_SEQ)||'',10); if(s > bestN){ bestN = s; best = String(s); } }catch(e){}
-    if(best === null) return String(new Date().getFullYear()) + '01';
+    if(best === null) return '1000';
     const m = best.match(/(\d+)\s*$/);
     const next = String(bestN + 1).padStart(m[1].length, '0');
     try{ localStorage.setItem(LS_SEQ, String(bestN + 1)); }catch(e){}
     return best.slice(0, m.index) + next;
   }
 
-  /* ---------- new / save / load / delete ---------- */
-  window.newInvoice = function(fresh){
-    const n = nextNumber();
-    $('invNum').textContent = n;
-    $('mDate').textContent = today();
-    $('mDue').textContent = today();
-    $('mRef').textContent = '';
-    $('customer').textContent = 'Customer Name\nStreet Address\nCity, ST 00000\nUnited States';
-    $('notes').textContent = '';
-    $('rows').innerHTML = '';
-    window.addRow('', '1', '0.00');
-    $('savedList').value = '';
-    $('custList').value = '';
-  };
-
-  function docs(){ try{ return JSON.parse(localStorage.getItem(LS_DOCS)||'{}'); }catch(e){ return {}; } }
-  function putDocs(d){ try{ localStorage.setItem(LS_DOCS, JSON.stringify(d)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
-
   /* ---------- customer book ---------- */
-  function custs(){ try{ return JSON.parse(localStorage.getItem(LS_CUST)||'{}'); }catch(e){ return {}; } }
   function rememberCustomer(){
-    const name = ($('customer').innerText||'').split('\n')[0].trim();
-    if(!name || name.toLowerCase() === 'customer name') return;
+    const name = custName();
+    if(!name) return;
     const c = custs();
     c[name] = $('customer').innerHTML;
-    try{ localStorage.setItem(LS_CUST, JSON.stringify(c)); }catch(e){}
+    lsPut(LS_CUST, c);
     refreshCustList(name);
+  }
+  function custName(){
+    const n = ($('customer').innerText||'').split('\n')[0].trim();
+    return n.toLowerCase() === 'customer name' ? '' : n;
   }
   window.loadCustomer = function(){
     const key = $('custList').value;
@@ -315,26 +444,113 @@ United States</div>
     s.value = sel || '';
   }
 
+  /* ---------- item book ---------- */
+  function refreshDL(){
+    const dl = $('itemsDL');
+    dl.innerHTML = '';
+    Object.keys(itemBook()).sort((a,b)=>a.localeCompare(b)).forEach(k=>{
+      const o = document.createElement('option'); o.value = k; dl.appendChild(o);
+    });
+  }
+  // new item names typed on an invoice get added to the book on save
+  function rememberItems(){
+    const book = itemBook();
+    let changed = false;
+    $('rows').querySelectorAll('tr').forEach(tr=>{
+      const name = tr.querySelector('.c-item input').value.trim();
+      if(name && !book[name]){
+        book[name] = { price:num(tr.querySelector('.c-price').textContent), taxable:tr.dataset.taxable==='1' };
+        changed = true;
+      }
+    });
+    if(changed){ lsPut(LS_ITEMS, book); refreshDL(); }
+  }
+
+  window.openItems = function(){
+    $('taxRateIn').value = taxRate() || '';
+    const tb = $('itemRows');
+    tb.innerHTML = '';
+    const book = itemBook();
+    Object.keys(book).sort((a,b)=>a.localeCompare(b)).forEach(k=>addItemRowEl(k, book[k]));
+    if(!Object.keys(book).length) addItemRowEl('', {price:'', taxable:false});
+    $('itemsModal').classList.add('open');
+  };
+  function addItemRowEl(name, it){
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="text" class="it-name" placeholder="Item name"></td>'+
+      '<td><input type="number" class="it-price" step="0.01" min="0" placeholder="0.00"></td>'+
+      '<td style="text-align:center"><input type="checkbox" class="it-tax"></td>'+
+      '<td><button title="Remove" onclick="this.closest(\'tr\').remove()" style="border:none;background:none;color:#c33;cursor:pointer">✕</button></td>';
+    tr.querySelector('.it-name').value = name || '';
+    if(it && it.price !== '' && it.price != null) tr.querySelector('.it-price').value = num(it.price);
+    tr.querySelector('.it-tax').checked = !!(it && it.taxable);
+    $('itemRows').appendChild(tr);
+  }
+  window.addItemRow = function(){ addItemRowEl('', {price:'', taxable:false}); };
+  window.saveItems = function(){
+    const book = {};
+    $('itemRows').querySelectorAll('tr').forEach(tr=>{
+      const name = tr.querySelector('.it-name').value.trim();
+      if(!name) return;
+      book[name] = { price:num(tr.querySelector('.it-price').value), taxable:tr.querySelector('.it-tax').checked };
+    });
+    lsPut(LS_ITEMS, book);
+    const s = settings(); s.taxRate = parseFloat($('taxRateIn').value) || 0; lsPut(LS_SET, s);
+    refreshDL();
+    // re-apply tax flags from the book to rows on screen so toggles take effect
+    $('rows').querySelectorAll('tr').forEach(tr=>{
+      const it = book[tr.querySelector('.c-item input').value.trim()];
+      if(it) tr.dataset.taxable = it.taxable ? '1' : '';
+    });
+    recalc();
+    $('itemsModal').classList.remove('open');
+  };
+  window.closeItems = function(){ $('itemsModal').classList.remove('open'); };
+
+  /* ---------- new / save / load / delete ---------- */
+  window.newInvoice = function(){
+    const n = nextNumber();
+    $('invNum').textContent = n;
+    $('mDate').textContent = today();
+    $('mDue').textContent = today();
+    $('mRef').textContent = '';
+    $('customer').textContent = 'Customer Name\nStreet Address\nCity, ST 00000\nUnited States';
+    $('notes').textContent = '';
+    $('rows').innerHTML = '';
+    window.addRow('', '', '1', '0.00', false);
+    $('savedList').value = '';
+    $('custList').value = '';
+    setPaidUI(false);
+  };
+
   window.saveInvoice = function(){
     const key = $('invNum').textContent.trim() || nextNumber();
-    let custName = ($('customer').innerText||'').split('\n')[0].trim();
-    if(custName.toLowerCase() === 'customer name') custName = '';
+    const cn = custName();
+    const t = computeTotals();
     const d = docs();
+    const prev = d[key] || {};
     d[key] = {
       inv:key,
-      label:'Invoice #' + key + (custName ? ' - ' + custName : ''),
+      label:'Invoice #' + key + (cn ? ' - ' + cn : ''),
       date:$('mDate').textContent, due:$('mDue').textContent,
       ref:$('mRef').textContent,
       customer:$('customer').innerHTML, notes:$('notes').innerHTML,
+      sub:t.sub, tax:t.tax, total:t.total, taxRate:t.rate,
+      paid:!!prev.paid, paidDate:prev.paidDate || null,
       rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
+        item: tr.querySelector('.c-item input').value,
         desc: tr.querySelector('.c-desc').textContent,
         qty:  tr.querySelector('.c-qty').textContent,
-        price:tr.querySelector('.c-price').textContent
+        price:num(tr.querySelector('.c-price').textContent),
+        taxable: tr.dataset.taxable === '1'
       }))
     };
-    putDocs(d);
+    lsPut(LS_DOCS, d);
     refreshList(key);
     rememberCustomer();
+    rememberItems();
+    return d[key];
   };
 
   window.loadSelected = function(){
@@ -347,8 +563,9 @@ United States</div>
     $('mRef').textContent = rec.ref||'';
     $('customer').innerHTML = rec.customer||''; $('notes').innerHTML = rec.notes||'';
     $('rows').innerHTML = '';
-    (rec.rows&&rec.rows.length?rec.rows:[{desc:'',qty:'1',price:'0.00'}])
-      .forEach(r=>$('rows').appendChild(rowHtml(r.desc,r.qty,r.price)));
+    (rec.rows&&rec.rows.length?rec.rows:[{item:'',desc:'',qty:'1',price:'0.00'}])
+      .forEach(r=>$('rows').appendChild(rowHtml(r.item, r.desc, r.qty, r.price, r.taxable)));
+    setPaidUI(!!rec.paid);
     recalc();
   };
 
@@ -357,27 +574,86 @@ United States</div>
     const d = docs();
     if(!d[key]){ alert('This invoice is not saved.'); return; }
     if(!confirm('Delete saved invoice ' + key + '?')) return;
-    delete d[key]; putDocs(d); refreshList('');
+    delete d[key]; lsPut(LS_DOCS, d); refreshList('');
   };
 
+  function labelFor(k, rec){
+    if(rec.label) return rec.label + (rec.paid ? '  ✓ PAID' : '');
+    const el = document.createElement('div');
+    el.innerHTML = String(rec.customer || '').replace(/<br[^>]*>|<\/(div|p)>/gi, '\n');
+    const nm = (el.textContent || '').split('\n')[0].trim();
+    return 'Invoice #' + k + (nm && nm.toLowerCase() !== 'customer name' ? ' - ' + nm : '') + (rec.paid ? '  ✓ PAID' : '');
+  }
   function refreshList(sel){
     const d = docs();
     const s = $('savedList');
     s.innerHTML = '<option value="">— Saved invoices —</option>';
     Object.keys(d).sort().reverse().forEach(k=>{
       const o = document.createElement('option'); o.value = k;
-      let label = d[k].label;
-      if(!label){ // older saves: rebuild the label from the stored customer block
-        const el = document.createElement('div');
-        el.innerHTML = String(d[k].customer || '').replace(/<br[^>]*>|<\/(div|p)>/gi, '\n');
-        const nm = (el.textContent || '').split('\n')[0].trim();
-        label = 'Invoice #' + k + (nm && nm.toLowerCase() !== 'customer name' ? ' - ' + nm : '');
-      }
-      o.textContent = label;
+      o.textContent = labelFor(k, d[k]);
       s.appendChild(o);
     });
     s.value = sel || '';
   }
+
+  /* ---------- paid / unpaid ---------- */
+  function setPaidUI(paid){
+    $('invSheet').classList.toggle('paid', !!paid);
+    $('paidBtn').textContent = paid ? '↩ Mark Unpaid' : '💰 Mark Paid';
+  }
+  window.togglePaid = function(){
+    const rec = window.saveInvoice(); // make sure it exists and is current
+    const d = docs();
+    const key = rec.inv;
+    d[key].paid = !d[key].paid;
+    d[key].paidDate = d[key].paid ? today() : null;
+    lsPut(LS_DOCS, d);
+    setPaidUI(d[key].paid);
+    refreshList(key);
+  };
+
+  /* ---------- report ---------- */
+  function buildReport(){
+    const d = docs();
+    let invoiced=0, paid=0, tax=0, taxPaid=0;
+    const tb = $('rRows');
+    tb.innerHTML = '';
+    Object.keys(d).sort().reverse().forEach(k=>{
+      const r = d[k];
+      let total = r.total, rtax = r.tax;
+      if(total == null){ // older saves: rebuild from rows, no tax info
+        total = (r.rows||[]).reduce((s,row)=>s + num(row.qty)*num(row.price), 0);
+        rtax = 0;
+      }
+      invoiced += total; tax += (rtax||0);
+      if(r.paid){ paid += total; taxPaid += (rtax||0); }
+      const el = document.createElement('div');
+      el.innerHTML = String(r.customer||'').replace(/<br[^>]*>|<\/(div|p)>/gi,'\n');
+      const cust = (el.textContent||'').split('\n')[0].trim();
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td></td><td class="num"></td><td class="num"></td><td></td>';
+      const tds = tr.children;
+      tds[0].textContent = '#' + k;
+      tds[1].textContent = cust && cust.toLowerCase() !== 'customer name' ? cust : '—';
+      tds[2].textContent = r.date || '';
+      tds[3].textContent = money(total);
+      tds[4].textContent = money(rtax||0);
+      tds[5].innerHTML = r.paid
+        ? '<span class="st-paid">Paid' + (r.paidDate ? ' ' + r.paidDate : '') + '</span>'
+        : '<span class="st-unpaid">Unpaid</span>';
+      tb.appendChild(tr);
+    });
+    $('rInvoiced').textContent = money(invoiced);
+    $('rPaid').textContent = money(paid);
+    $('rDue').textContent = money(invoiced - paid);
+    $('rTax').textContent = money(taxPaid);
+    $('rsub').textContent = 'All saved invoices as of ' + today() + ' — tax collected counts paid invoices only.';
+  }
+  window.toggleReport = function(){
+    const on = document.body.classList.toggle('reporting');
+    if(on) buildReport();
+    $('reportBtn').textContent = on ? '🧾 Invoice' : '📊 Report';
+  };
 
   window.doPrint = function(){ document.activeElement && document.activeElement.blur(); window.print(); };
 
@@ -385,9 +661,10 @@ United States</div>
   loadCompany();
   refreshList('');
   refreshCustList('');
+  refreshDL();
   $('mDate').textContent = today();
   $('mDue').textContent = today();
-  window.addRow('Technical Support', '1', '100.00');
+  window.addRow('', '', '1', '0.00', false);
 })();
 </script>
 </body>
