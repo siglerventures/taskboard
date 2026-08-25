@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.8</title>
+<title>Simple Invoicing v1.9</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -89,9 +89,27 @@
   }
   td.c-item input:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
   td.c-item input:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
-  td.del{ width:26px; text-align:center; border-bottom:1px solid var(--line); background:#fff !important; }
-  td.del button{ border:none; background:none; color:#c33; cursor:pointer; font-size:15px; visibility:hidden; }
-  tr:hover td.del button{ visibility:visible; }
+  td.grip{
+    width:18px; padding:10px 2px; text-align:center; cursor:grab;
+    color:#b7abe8; font-size:13px; letter-spacing:-1px; user-select:none;
+    border-bottom:1px solid var(--line); background:#fff !important;
+  }
+  td.grip span{ visibility:hidden; }
+  tr:hover td.grip span{ visibility:visible; }
+  tr.dragging td{ opacity:.45; }
+
+  /* right-click menu on invoice lines */
+  .ctx{
+    display:none; position:fixed; z-index:200; background:#fff;
+    border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.18);
+    padding:4px; min-width:160px;
+  }
+  .ctx button{
+    display:block; width:100%; text-align:left; font:inherit; font-size:14px;
+    padding:8px 12px; border:none; background:none; border-radius:6px; cursor:pointer;
+  }
+  .ctx button:hover{ background:var(--band); }
+  .ctx button.danger:hover{ background:#fdecea; color:#c0392b; }
 
   .notes{ font-style:italic; font-size:13.5px; margin:14px 2px 0; outline:none; min-height:18px; }
 
@@ -162,7 +180,7 @@
   @media print{
     @page{ size:letter; margin:0; }
     body{ background:#fff; }
-    .toolbar, .hint, td.del, .noprint, .modal-bg{ display:none !important; }
+    .toolbar, .hint, .noprint, .modal-bg, .ctx{ display:none !important; }
     .sheet{ box-shadow:none; margin:0; width:auto; min-height:0; }
     [contenteditable]:hover, [contenteditable]:focus{ background:transparent; box-shadow:none; }
     td.c-item input:hover, td.c-item input:focus{ background:transparent; box-shadow:none; }
@@ -186,7 +204,7 @@
   <button id="reportBtn" onclick="window.toggleReport()">📊 Report</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
 
 <div class="sheet inv" id="invSheet">
   <div class="head">
@@ -232,7 +250,7 @@ United States</div>
           <th class="qty" style="width:8%">Qty</th>
           <th class="num" style="width:13%">Unit Price</th>
           <th class="num" style="width:15%">Amount</th>
-          <th class="del noprint"></th>
+          <th class="grip noprint"></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
@@ -295,6 +313,12 @@ United States</div>
 
 <datalist id="itemsDL"></datalist>
 
+<!-- right-click menu for invoice lines -->
+<div class="ctx noprint" id="ctxMenu">
+  <button onclick="window.ctxAddLine()">＋ Add line below</button>
+  <button class="danger" onclick="window.ctxRemoveLine()">✕ Remove line</button>
+</div>
+
 <script>
 (function(){
   const LS_CO    = 'sinv_company';
@@ -334,7 +358,7 @@ United States</div>
       '<td contenteditable="true" class="c-qty"></td>'+
       '<td contenteditable="true" class="num c-price"></td>'+
       '<td class="num c-amt">$ 0.00</td>'+
-      '<td class="del noprint"><button title="Remove line" onclick="this.closest(\'tr\').remove(); window.recalc()">✕</button></td>';
+      '<td class="grip noprint" title="Drag to reorder — right-click for more"><span>⋮⋮</span></td>';
     const itemIn = tr.querySelector('.c-item input');
     itemIn.value = item || '';
     fitItem(itemIn);
@@ -391,6 +415,58 @@ United States</div>
     }
     recalc();
   });
+  /* ---------- right-click menu on lines ---------- */
+  let ctxRow = null;
+  $('rows').addEventListener('contextmenu', e=>{
+    const tr = e.target.closest ? e.target.closest('tr') : null;
+    if(!tr) return;
+    e.preventDefault();
+    ctxRow = tr;
+    const m = $('ctxMenu');
+    m.style.display = 'block';
+    m.style.left = Math.min(e.clientX, window.innerWidth - 180) + 'px';
+    m.style.top  = Math.min(e.clientY, window.innerHeight - 100) + 'px';
+  });
+  function hideCtx(){ $('ctxMenu').style.display = 'none'; }
+  document.addEventListener('click', hideCtx);
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') hideCtx(); });
+  window.addEventListener('blur', hideCtx);
+  window.ctxAddLine = function(){
+    if(ctxRow) ctxRow.after(rowHtml('', '', '1', '0.00', false));
+    hideCtx(); recalc();
+  };
+  window.ctxRemoveLine = function(){
+    if(ctxRow) ctxRow.remove();
+    ctxRow = null;
+    hideCtx(); recalc();
+  };
+
+  /* ---------- drag & drop reordering ---------- */
+  let dragRow = null;
+  $('rows').addEventListener('mousedown', e=>{
+    const g = e.target.closest ? e.target.closest('td.grip') : null;
+    if(g) g.closest('tr').draggable = true;
+  });
+  $('rows').addEventListener('dragstart', e=>{
+    dragRow = e.target.closest ? e.target.closest('tr') : null;
+    if(!dragRow) return;
+    dragRow.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', ''); }catch(err){}
+  });
+  $('rows').addEventListener('dragover', e=>{
+    if(!dragRow) return;
+    e.preventDefault();
+    const tr = e.target.closest ? e.target.closest('tr') : null;
+    if(!tr || tr === dragRow) return;
+    const r = tr.getBoundingClientRect();
+    tr.parentNode.insertBefore(dragRow, e.clientY > r.top + r.height/2 ? tr.nextSibling : tr);
+  });
+  $('rows').addEventListener('drop', e=>e.preventDefault());
+  $('rows').addEventListener('dragend', ()=>{
+    if(dragRow){ dragRow.classList.remove('dragging'); dragRow.draggable = false; dragRow = null; recalc(); }
+  });
+
   // tidy quantities and prices when you click away: 5.00 -> 5, price -> $ 125.00
   $('rows').addEventListener('focusout', e=>{
     if(!e.target || !e.target.closest) return;
