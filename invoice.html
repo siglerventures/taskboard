@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.2</title>
+<title>Simple Invoicing v1.3</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -306,9 +306,13 @@ United States</div>
 
   window.saveInvoice = function(){
     const key = $('invNum').textContent.trim() || nextNumber();
+    let custName = ($('customer').innerText||'').split('\n')[0].trim();
+    if(custName.toLowerCase() === 'customer name') custName = '';
     const d = docs();
     d[key] = {
-      inv:key, date:$('mDate').textContent, due:$('mDue').textContent,
+      inv:key,
+      label:'Invoice #' + key + (custName ? ' - ' + custName : ''),
+      date:$('mDate').textContent, due:$('mDue').textContent,
       ref:$('mRef').textContent,
       customer:$('customer').innerHTML, notes:$('notes').innerHTML,
       rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
@@ -350,7 +354,16 @@ United States</div>
     const s = $('savedList');
     s.innerHTML = '<option value="">— Saved invoices —</option>';
     Object.keys(d).sort().reverse().forEach(k=>{
-      const o = document.createElement('option'); o.value = k; o.textContent = k; s.appendChild(o);
+      const o = document.createElement('option'); o.value = k;
+      let label = d[k].label;
+      if(!label){ // older saves: rebuild the label from the stored customer block
+        const el = document.createElement('div');
+        el.innerHTML = String(d[k].customer || '').replace(/<br[^>]*>|<\/(div|p)>/gi, '\n');
+        const nm = (el.textContent || '').split('\n')[0].trim();
+        label = 'Invoice #' + k + (nm && nm.toLowerCase() !== 'customer name' ? ' - ' + nm : '');
+      }
+      o.textContent = label;
+      s.appendChild(o);
     });
     s.value = sel || '';
   }
