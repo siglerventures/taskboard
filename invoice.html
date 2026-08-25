@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.2</title>
+<title>Simple Invoicing v1.4</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -73,7 +73,8 @@
     border-bottom:2px solid var(--ink); padding:8px 10px;
   }
   table.items th.num, table.items td.num{ text-align:right; }
-  table.items th.qty{ color:var(--purple); }
+  table.items th.qty{ color:var(--purple); text-align:center; }
+  table.items td.c-qty{ text-align:center; }
   table.items td{ padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
   table.items tbody tr:nth-child(odd) td{ background:var(--band); }
   table.items td[contenteditable]{ outline:none; }
@@ -159,7 +160,7 @@ United States</div>
       <thead>
         <tr>
           <th style="width:46%">Description</th>
-          <th class="num qty" style="width:16%">Quantity</th>
+          <th class="qty" style="width:16%">Quantity</th>
           <th class="num" style="width:18%">Unit Price</th>
           <th class="num" style="width:20%">Amount</th>
           <th class="del noprint"></th>
@@ -190,6 +191,8 @@ United States</div>
   const $ = id => document.getElementById(id);
   const money = n => '$ ' + (isFinite(n)?n:0).toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2});
   const num = s => parseFloat(String(s).replace(/[^0-9.\-]/g,'')) || 0;
+  // "5.00" -> "5", "5.25" -> "5.25"; leaves non-numeric text alone
+  const fmtQty = s => { const t = String(s==null?'':s).trim(); return /^[0-9.,\s]+$/.test(t) && t !== '' ? String(num(t)) : t; };
   const today = () => { const d=new Date(); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+'/'+d.getFullYear(); };
 
   /* ---------- rows ---------- */
@@ -197,12 +200,12 @@ United States</div>
     const tr = document.createElement('tr');
     tr.innerHTML =
       '<td contenteditable="true" class="c-desc"></td>'+
-      '<td contenteditable="true" class="num c-qty"></td>'+
+      '<td contenteditable="true" class="c-qty"></td>'+
       '<td contenteditable="true" class="num c-price"></td>'+
       '<td class="num c-amt">$ 0.00</td>'+
       '<td class="del noprint"><button title="Remove line" onclick="this.closest(\'tr\').remove(); window.recalc()">✕</button></td>';
     tr.querySelector('.c-desc').textContent  = desc  || '';
-    tr.querySelector('.c-qty').textContent   = qty   || '1.00';
+    tr.querySelector('.c-qty').textContent   = fmtQty(qty || '1');
     tr.querySelector('.c-price').textContent = price || '0.00';
     return tr;
   }
@@ -223,6 +226,14 @@ United States</div>
     $('grand').textContent = money(total);
   }
   $('rows').addEventListener('input', recalc);
+  // tidy quantities when you click away: 5.00 -> 5, but 5.25 stays 5.25
+  $('rows').addEventListener('focusout', e=>{
+    const td = e.target && e.target.closest ? e.target.closest('.c-qty') : null;
+    if(!td) return;
+    const t = td.textContent.trim();
+    const f = fmtQty(t);
+    if(f !== t) td.textContent = f;
+  });
 
   /* ---------- company persistence ---------- */
   const CO_FIELDS = ['coName','coTag','coAddr','foot'];
@@ -270,7 +281,7 @@ United States</div>
     $('customer').textContent = 'Customer Name\nStreet Address\nCity, ST 00000\nUnited States';
     $('notes').textContent = '';
     $('rows').innerHTML = '';
-    window.addRow('', '1.00', '0.00');
+    window.addRow('', '1', '0.00');
     $('savedList').value = '';
     $('custList').value = '';
   };
@@ -306,9 +317,13 @@ United States</div>
 
   window.saveInvoice = function(){
     const key = $('invNum').textContent.trim() || nextNumber();
+    let custName = ($('customer').innerText||'').split('\n')[0].trim();
+    if(custName.toLowerCase() === 'customer name') custName = '';
     const d = docs();
     d[key] = {
-      inv:key, date:$('mDate').textContent, due:$('mDue').textContent,
+      inv:key,
+      label:'Invoice #' + key + (custName ? ' - ' + custName : ''),
+      date:$('mDate').textContent, due:$('mDue').textContent,
       ref:$('mRef').textContent,
       customer:$('customer').innerHTML, notes:$('notes').innerHTML,
       rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
@@ -332,7 +347,7 @@ United States</div>
     $('mRef').textContent = rec.ref||'';
     $('customer').innerHTML = rec.customer||''; $('notes').innerHTML = rec.notes||'';
     $('rows').innerHTML = '';
-    (rec.rows&&rec.rows.length?rec.rows:[{desc:'',qty:'1.00',price:'0.00'}])
+    (rec.rows&&rec.rows.length?rec.rows:[{desc:'',qty:'1',price:'0.00'}])
       .forEach(r=>$('rows').appendChild(rowHtml(r.desc,r.qty,r.price)));
     recalc();
   };
@@ -350,7 +365,16 @@ United States</div>
     const s = $('savedList');
     s.innerHTML = '<option value="">— Saved invoices —</option>';
     Object.keys(d).sort().reverse().forEach(k=>{
-      const o = document.createElement('option'); o.value = k; o.textContent = k; s.appendChild(o);
+      const o = document.createElement('option'); o.value = k;
+      let label = d[k].label;
+      if(!label){ // older saves: rebuild the label from the stored customer block
+        const el = document.createElement('div');
+        el.innerHTML = String(d[k].customer || '').replace(/<br[^>]*>|<\/(div|p)>/gi, '\n');
+        const nm = (el.textContent || '').split('\n')[0].trim();
+        label = 'Invoice #' + k + (nm && nm.toLowerCase() !== 'customer name' ? ' - ' + nm : '');
+      }
+      o.textContent = label;
+      s.appendChild(o);
     });
     s.value = sel || '';
   }
@@ -363,7 +387,7 @@ United States</div>
   refreshCustList('');
   $('mDate').textContent = today();
   $('mDue').textContent = today();
-  window.addRow('Technical Support', '1.00', '100.00');
+  window.addRow('Technical Support', '1', '100.00');
 })();
 </script>
 </body>
