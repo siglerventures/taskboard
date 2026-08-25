@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.7</title>
+<title>Simple Invoicing v1.8</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -81,7 +81,7 @@
   table.items th.num, table.items td.num{ text-align:right; }
   table.items th.qty{ color:var(--purple); text-align:center; }
   table.items td.c-qty{ text-align:center; }
-  table.items td{ padding:10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  table.items td{ padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
   table.items tbody tr:nth-child(odd) td{ background:var(--band); }
   table.items td[contenteditable]{ outline:none; }
   td.c-item input{
@@ -227,11 +227,11 @@ United States</div>
     <table class="items">
       <thead>
         <tr>
-          <th style="width:22%">Item</th>
-          <th style="width:28%">Description</th>
-          <th class="qty" style="width:11%">Quantity</th>
-          <th class="num" style="width:19%">Unit Price</th>
-          <th class="num" style="width:20%">Amount</th>
+          <th style="width:26%">Item</th>
+          <th style="width:38%">Description</th>
+          <th class="qty" style="width:8%">Qty</th>
+          <th class="num" style="width:13%">Unit Price</th>
+          <th class="num" style="width:15%">Amount</th>
           <th class="del noprint"></th>
         </tr>
       </thead>
@@ -310,6 +310,11 @@ United States</div>
   // "5.00" -> "5", "5.25" -> "5.25"; leaves non-numeric text alone
   const fmtQty = s => { const t = String(s==null?'':s).trim(); return /^[0-9.,\s]+$/.test(t) && t !== '' ? String(num(t)) : t; };
   const today = () => { const d=new Date(); return String(d.getMonth()+1).padStart(2,'0')+'/'+String(d.getDate()).padStart(2,'0')+'/'+d.getFullYear(); };
+  // the item field is a single-line input that can't wrap, so shrink long names to fit
+  const fitItem = inp => {
+    const n = inp.value.length;
+    inp.style.fontSize = n > 32 ? '11px' : n > 26 ? '12px' : n > 21 ? '13px' : '';
+  };
 
   function lsGet(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)||'null') || fallback; }catch(e){ return fallback; } }
   function lsPut(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
@@ -330,7 +335,9 @@ United States</div>
       '<td contenteditable="true" class="num c-price"></td>'+
       '<td class="num c-amt">$ 0.00</td>'+
       '<td class="del noprint"><button title="Remove line" onclick="this.closest(\'tr\').remove(); window.recalc()">✕</button></td>';
-    tr.querySelector('.c-item input').value = item || '';
+    const itemIn = tr.querySelector('.c-item input');
+    itemIn.value = item || '';
+    fitItem(itemIn);
     tr.querySelector('.c-desc').textContent  = desc  || '';
     tr.querySelector('.c-qty').textContent   = fmtQty(qty || '1');
     tr.querySelector('.c-price').textContent = money(num(price || 0));
@@ -367,7 +374,10 @@ United States</div>
     $('taxT').textContent = money(t.tax);
     $('grand').textContent = money(t.total);
   }
-  $('rows').addEventListener('input', recalc);
+  $('rows').addEventListener('input', e=>{
+    if(e.target instanceof HTMLInputElement) fitItem(e.target);
+    recalc();
+  });
   // picking or typing a known item fills its price and tax setting
   $('rows').addEventListener('change', e=>{
     if(!(e.target instanceof HTMLInputElement)) return;
