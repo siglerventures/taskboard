@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.6</title>
+<title>Simple Invoicing v1.7</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -174,7 +174,7 @@
 <body>
 
 <div class="toolbar">
-  <a class="brand" href="./" title="Back to the main page">🏚️ Main</a>
+  <a class="brand" href="#" title="Back to a fresh invoice" onclick="window.goHome(); return false;">🏚️ Main</a>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
   <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
@@ -406,21 +406,30 @@ United States</div>
   /* ---------- invoice numbering ----------
      Continues from the highest number in use: current invoice, saved
      invoices, and the stored counter — keeping the same prefix/padding. */
-  function nextNumber(){
+  function scanBest(includeScreen){
     let best = null, bestN = -1;
     const consider = c => {
       const m = String(c).trim().match(/(\d+)\s*$/);
       if(m){ const n = parseInt(m[1],10); if(n > bestN){ bestN = n; best = String(c).trim(); } }
     };
-    consider($('invNum').textContent);
+    if(includeScreen) consider($('invNum').textContent);
     Object.keys(docs()).forEach(consider);
     try{ const s = parseInt(localStorage.getItem(LS_SEQ)||'',10); if(s > bestN){ bestN = s; best = String(s); } }catch(e){}
-    if(best === null) return '1000';
-    const m = best.match(/(\d+)\s*$/);
-    const next = String(bestN + 1).padStart(m[1].length, '0');
-    try{ localStorage.setItem(LS_SEQ, String(bestN + 1)); }catch(e){}
-    return best.slice(0, m.index) + next;
+    return { best: best, bestN: bestN };
   }
+  function bumpFrom(r){
+    if(r.best === null) return '1000';
+    const m = r.best.match(/(\d+)\s*$/);
+    return r.best.slice(0, m.index) + String(r.bestN + 1).padStart(m[1].length, '0');
+  }
+  function nextNumber(){
+    const r = scanBest(true);
+    const n = bumpFrom(r);
+    if(r.best !== null) try{ localStorage.setItem(LS_SEQ, String(r.bestN + 1)); }catch(e){}
+    return n;
+  }
+  // like nextNumber but ignores the unsaved invoice on screen and reserves nothing
+  function peekNumber(){ return bumpFrom(scanBest(false)); }
 
   /* ---------- customer book ---------- */
   function rememberCustomer(){
@@ -518,9 +527,8 @@ United States</div>
   window.closeItems = function(){ $('itemsModal').classList.remove('open'); };
 
   /* ---------- new / save / load / delete ---------- */
-  window.newInvoice = function(){
+  function resetInvoice(n){
     exitReport();
-    const n = nextNumber();
     $('invNum').textContent = n;
     $('mDate').textContent = today();
     $('mDue').textContent = today();
@@ -532,7 +540,10 @@ United States</div>
     $('savedList').value = '';
     $('custList').value = '';
     setPaidUI(false);
-  };
+  }
+  window.newInvoice = function(){ resetInvoice(nextNumber()); };
+  // Main: back to the home screen — a clean invoice at the next unsaved number
+  window.goHome = function(){ resetInvoice(peekNumber()); };
 
   window.saveInvoice = function(){
     exitReport();
