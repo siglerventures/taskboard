@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Simple Invoicing v1.5</title>
+<title>Simple Invoicing v1.6</title>
 <style>
   :root{
     --purple:#5b3df5;
@@ -26,7 +26,11 @@
     background:#fff; border-bottom:1px solid var(--line);
     padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
   }
-  .toolbar .brand{ font-weight:700; color:var(--purple); margin-right:auto; }
+  .toolbar a.brand{
+    font-weight:700; color:var(--purple); margin-right:auto; text-decoration:none;
+    padding:8px 14px; border:1px solid var(--line); border-radius:8px;
+  }
+  .toolbar a.brand:hover{ background:#f6f5fc; }
   .toolbar button, .toolbar select, .modal button{
     font:inherit; font-size:14px; padding:8px 14px; border-radius:8px;
     border:1px solid var(--line); background:#fff; cursor:pointer;
@@ -146,6 +150,8 @@
   table.rtab{ width:100%; border-collapse:collapse; font-size:14px; }
   table.rtab th{ text-align:left; padding:8px 10px; border-bottom:2px solid var(--ink); font-weight:600; }
   table.rtab td{ padding:8px 10px; border-bottom:1px solid var(--line); }
+  table.rtab tbody tr{ cursor:pointer; }
+  table.rtab tbody tr:hover td{ background:#e3dcf9; }
   table.rtab th.num, table.rtab td.num{ text-align:right; }
   table.rtab tbody tr:nth-child(odd) td{ background:var(--band); }
   .st-paid{ color:var(--green); font-weight:700; }
@@ -168,7 +174,7 @@
 <body>
 
 <div class="toolbar">
-  <span class="brand">🧾 Simple Invoicing</span>
+  <a class="brand" href="./" title="Back to the main page">🏚️ Main</a>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
   <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
@@ -333,6 +339,7 @@ United States</div>
   }
 
   window.addRow = function(item, desc, qty, price, taxable){
+    exitReport();
     $('rows').appendChild(rowHtml(item, desc, qty, price, taxable));
     recalc();
   };
@@ -431,6 +438,7 @@ United States</div>
   window.loadCustomer = function(){
     const key = $('custList').value;
     if(!key) return;
+    exitReport();
     const c = custs()[key];
     if(c != null) $('customer').innerHTML = c;
   };
@@ -467,6 +475,7 @@ United States</div>
   }
 
   window.openItems = function(){
+    exitReport();
     $('taxRateIn').value = taxRate() || '';
     const tb = $('itemRows');
     tb.innerHTML = '';
@@ -510,6 +519,7 @@ United States</div>
 
   /* ---------- new / save / load / delete ---------- */
   window.newInvoice = function(){
+    exitReport();
     const n = nextNumber();
     $('invNum').textContent = n;
     $('mDate').textContent = today();
@@ -525,6 +535,7 @@ United States</div>
   };
 
   window.saveInvoice = function(){
+    exitReport();
     const key = $('invNum').textContent.trim() || nextNumber();
     const cn = custName();
     const t = computeTotals();
@@ -558,6 +569,7 @@ United States</div>
     if(!key) return;
     const rec = docs()[key];
     if(!rec) return;
+    exitReport();
     $('invNum').textContent = rec.inv;
     $('mDate').textContent = rec.date||''; $('mDue').textContent = rec.due||'';
     $('mRef').textContent = rec.ref||'';
@@ -570,6 +582,7 @@ United States</div>
   };
 
   window.deleteInvoice = function(){
+    exitReport();
     const key = $('savedList').value || $('invNum').textContent.trim();
     const d = docs();
     if(!d[key]){ alert('This invoice is not saved.'); return; }
@@ -632,6 +645,8 @@ United States</div>
       const cust = (el.textContent||'').split('\n')[0].trim();
       const tr = document.createElement('tr');
       tr.innerHTML = '<td></td><td></td><td></td><td class="num"></td><td class="num"></td><td></td>';
+      tr.title = 'Double-click to open this invoice';
+      tr.addEventListener('dblclick', ()=>{ $('savedList').value = k; window.loadSelected(); });
       const tds = tr.children;
       tds[0].textContent = '#' + k;
       tds[1].textContent = cust && cust.toLowerCase() !== 'customer name' ? cust : '—';
@@ -649,11 +664,13 @@ United States</div>
     $('rTax').textContent = money(taxPaid);
     $('rsub').textContent = 'All saved invoices as of ' + today() + ' — tax collected counts paid invoices only.';
   }
-  window.toggleReport = function(){
-    const on = document.body.classList.toggle('reporting');
-    if(on) buildReport();
+  function setReport(on){
+    document.body.classList.toggle('reporting', on);
     $('reportBtn').textContent = on ? '🧾 Invoice' : '📊 Report';
-  };
+    if(on) buildReport();
+  }
+  function exitReport(){ if(document.body.classList.contains('reporting')) setReport(false); }
+  window.toggleReport = function(){ setReport(!document.body.classList.contains('reporting')); };
 
   window.doPrint = function(){ document.activeElement && document.activeElement.blur(); window.print(); };
 
