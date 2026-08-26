@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.0 -->
+<!-- Accounting (Simple Invoicing) v2.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -118,15 +118,43 @@ onAuthStateChanged(auth, async (user) => {
     --band:#f0edfa;
     --green:#1a9c4b;
     --red:#c0392b;
+    --page:#eceef2;      /* page background behind the sheet */
+    --panel:#ffffff;     /* toolbar, menus, light modals */
+    --panel-hov:#f6f5fc;
+    --sheet:#ffffff;     /* the invoice "paper" */
+    --edit-hov:#faf9ff;
+    --edit-ring:#d9d2f5;
+    --wave-lav:#e6e0f8;
+    --wave-rib:#d8d0f2;
+    --foot:#475569;
+  }
+  html[data-theme="dark"]{
+    --purple:#8b76ff;
+    --purple-dark:#7a63f5;
+    --ink:#e2e8f0;
+    --muted:#8b93a6;
+    --line:#2c3a55;
+    --band:#1e2740;
+    --green:#2fbf67;
+    --red:#e05747;
+    --page:#0b1120;
+    --panel:#1e293b;
+    --panel-hov:#273549;
+    --sheet:#151d31;
+    --edit-hov:#1b2540;
+    --edit-ring:#3a3f66;
+    --wave-lav:#322c55;
+    --wave-rib:#453d78;
+    --foot:#8b93a6;
   }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; padding:0; background:#eceef2; color:var(--ink);
+  html,body{ margin:0; padding:0; background:var(--page); color:var(--ink);
     font-family:"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif; }
 
   /* ---------- toolbar (never printed) ---------- */
   .toolbar{
     position:sticky; top:0; z-index:50;
-    background:#fff; border-bottom:1px solid var(--line);
+    background:var(--panel); border-bottom:1px solid var(--line);
     padding:10px 16px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;
   }
   .toolbar a.brand{
@@ -136,9 +164,9 @@ onAuthStateChanged(auth, async (user) => {
   .toolbar a.brand:hover{ background:#f6f5fc; }
   .toolbar button, .toolbar select, .modal button{
     font:inherit; font-size:14px; padding:8px 14px; border-radius:8px;
-    border:1px solid var(--line); background:#fff; cursor:pointer;
+    border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer;
   }
-  .toolbar button:hover, .modal button:hover{ background:#f6f5fc; }
+  .toolbar button:hover, .modal button:hover{ background:var(--panel-hov); }
   .toolbar button.primary, .modal button.primary{ background:var(--purple); border-color:var(--purple); color:#fff; }
   .toolbar button.primary:hover, .modal button.primary:hover{ background:var(--purple-dark); }
   .toolbar select{ max-width:230px; }
@@ -147,7 +175,7 @@ onAuthStateChanged(auth, async (user) => {
   /* ---------- page / sheet ---------- */
   .sheet{
     width:8.5in; max-width:100%; min-height:10in; margin:18px auto 40px;
-    background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.12);
+    background:var(--sheet); box-shadow:0 2px 14px rgba(0,0,0,.12);
     display:flex; flex-direction:column;
   }
 
@@ -160,6 +188,9 @@ onAuthStateChanged(auth, async (user) => {
   .company-addr{ text-align:right; font-size:14px; line-height:1.45; white-space:pre-line; outline:none; }
   .wave{ height:70px; margin:6px -40px 0; position:relative; overflow:hidden; }
   .wave svg{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+  .wave svg path:nth-child(1){ fill:var(--wave-lav); }
+  .wave svg path:nth-child(2), .wave svg path:nth-child(3){ fill:var(--sheet); }
+  .wave svg path:nth-child(4){ fill:var(--wave-rib); }
 
   .body{ padding:8px 40px 30px; flex:1; display:flex; flex-direction:column; }
 
@@ -190,12 +221,13 @@ onAuthStateChanged(auth, async (user) => {
   td.c-item input{
     font:inherit; width:100%; border:none; background:transparent; outline:none; padding:0;
   }
-  td.c-item input:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
-  td.c-item input:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
+  td.c-item input{ color:var(--ink); }
+  td.c-item input:hover{ background:var(--edit-hov); box-shadow:0 0 0 1px var(--edit-ring); border-radius:3px; }
+  td.c-item input:focus{ background:var(--sheet); box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
   td.grip{
     width:18px; padding:10px 2px; text-align:center; cursor:grab;
     color:#b7abe8; font-size:13px; letter-spacing:-1px; user-select:none;
-    border-bottom:1px solid var(--line); background:#fff !important;
+    border-bottom:1px solid var(--line); background:var(--sheet) !important;
   }
   td.grip span{ visibility:hidden; }
   tr:hover td.grip span{ visibility:visible; }
@@ -203,16 +235,16 @@ onAuthStateChanged(auth, async (user) => {
 
   /* right-click menu on invoice lines */
   .ctx{
-    display:none; position:fixed; z-index:200; background:#fff;
+    display:none; position:fixed; z-index:200; background:var(--panel);
     border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 24px rgba(0,0,0,.18);
     padding:4px; min-width:160px;
   }
   .ctx button{
     display:block; width:100%; text-align:left; font:inherit; font-size:14px;
-    padding:8px 12px; border:none; background:none; border-radius:6px; cursor:pointer;
+    padding:8px 12px; border:none; background:none; color:var(--ink); border-radius:6px; cursor:pointer;
   }
   .ctx button:hover{ background:var(--band); }
-  .ctx button.danger:hover{ background:#fdecea; color:#c0392b; }
+  .ctx button.danger:hover{ background:var(--band); color:var(--red); }
 
   .notes{ font-style:italic; font-size:13.5px; margin:14px 2px 0; outline:none; min-height:18px; }
 
@@ -230,8 +262,8 @@ onAuthStateChanged(auth, async (user) => {
 
   .foot{ padding:14px 40px 22px; text-align:center; color:var(--muted); font-size:12.5px; white-space:pre-line; outline:none; }
 
-  [contenteditable]:hover{ background:#faf9ff; box-shadow:0 0 0 1px #d9d2f5; border-radius:3px; }
-  [contenteditable]:focus{ background:#fff; box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
+  [contenteditable]:hover{ background:var(--edit-hov); box-shadow:0 0 0 1px var(--edit-ring); border-radius:3px; }
+  [contenteditable]:focus{ background:var(--sheet); box-shadow:0 0 0 2px var(--purple); border-radius:3px; }
 
   /* ---------- items & tax modal ---------- */
   .modal-bg{
@@ -240,7 +272,7 @@ onAuthStateChanged(auth, async (user) => {
   }
   .modal-bg.open{ display:flex; }
   .modal{
-    background:#fff; border-radius:12px; padding:22px; width:640px; max-width:96vw;
+    background:var(--panel); color:var(--ink); border-radius:12px; padding:22px; width:640px; max-width:96vw;
     max-height:86vh; overflow:auto; box-shadow:0 10px 40px rgba(0,0,0,.3);
   }
   .modal h2{ margin:0 0 14px; color:var(--purple); font-size:19px; }
@@ -249,6 +281,7 @@ onAuthStateChanged(auth, async (user) => {
   .modal td{ padding:6px 8px; border-bottom:1px solid var(--line); }
   .modal input[type=text], .modal input[type=number]{
     font:inherit; font-size:14px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; width:100%;
+    background:var(--sheet); color:var(--ink);
   }
   .modal input[type=checkbox]{ width:17px; height:17px; }
   .modal .rowbtns{ margin-top:14px; display:flex; gap:8px; justify-content:flex-end; }
@@ -272,7 +305,7 @@ onAuthStateChanged(auth, async (user) => {
   table.rtab th{ text-align:left; padding:8px 10px; border-bottom:2px solid var(--ink); font-weight:600; }
   table.rtab td{ padding:8px 10px; border-bottom:1px solid var(--line); }
   table.rtab tbody tr{ cursor:pointer; }
-  table.rtab tbody tr:hover td{ background:#e3dcf9; }
+  table.rtab tbody tr:hover td{ background:var(--edit-ring); }
   table.rtab th.num, table.rtab td.num{ text-align:right; }
   table.rtab tbody tr:nth-child(odd) td{ background:var(--band); }
   .st-paid{ color:var(--green); font-weight:700; }
@@ -280,14 +313,14 @@ onAuthStateChanged(auth, async (user) => {
   .report .pl{ margin-top:22px; font-size:13px; color:var(--muted); }
   .report h2{ color:var(--purple); font-size:17px; font-weight:600; margin:26px 0 8px; }
   .report .rctrl{ margin:0 0 12px; font-size:14px; }
-  .report .rctrl select{ font:inherit; font-size:14px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; }
+  .report .rctrl select{ font:inherit; font-size:14px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); }
   table.rtab tfoot td{ border-top:2px solid var(--ink); font-weight:700; }
   table.rtab td.neg{ color:var(--red); }
   .report h2 button{
     font:inherit; font-size:13px; padding:4px 10px; margin-left:10px; vertical-align:2px;
-    border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer;
+    border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--ink); cursor:pointer;
   }
-  .report h2 button:hover{ background:#f6f5fc; }
+  .report h2 button:hover{ background:var(--panel-hov); }
   #expRows td[contenteditable]{ outline:none; }
   #expRows td.xdel{ width:26px; text-align:center; }
   #expRows td.xdel button{ border:none; background:none; color:#c33; cursor:pointer; visibility:hidden; }
@@ -295,6 +328,13 @@ onAuthStateChanged(auth, async (user) => {
 
   /* ---------- print ---------- */
   @media print{
+    /* paper is always light, whatever the on-screen theme */
+    html, html[data-theme="dark"]{
+      --purple:#5b3df5; --purple-dark:#4a2fd0; --ink:#1f2430; --muted:#6b7280;
+      --line:#e5e7eb; --band:#f0edfa; --green:#1a9c4b; --red:#c0392b;
+      --page:#fff; --panel:#fff; --panel-hov:#fff; --sheet:#fff;
+      --edit-hov:#fff; --edit-ring:#fff; --wave-lav:#e6e0f8; --wave-rib:#d8d0f2;
+    }
     @page{ size:letter; margin:0; }
     body{ background:#fff; }
     .toolbar, .hint, .noprint, .modal-bg, .ctx{ display:none !important; }
@@ -331,6 +371,7 @@ onAuthStateChanged(auth, async (user) => {
   <button id="paidBtn" onclick="window.togglePaid()">💰 Mark Paid</button>
   <button onclick="window.deleteInvoice()">🗑 Delete</button>
   <button id="reportBtn" onclick="window.toggleReport()">📊 Report</button>
+  <button id="themeBtn" onclick="window.toggleTheme()" title="Switch dark / light mode">🌙 Dark</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
 <div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
@@ -534,7 +575,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:#334155"><span id="sv-version">v2.0</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:#475569;display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:#475569">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:#475569;display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:#475569;vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:#475569">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v2.1</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -1121,6 +1162,18 @@ United States</div>
 
   window.doPrint = function(){ document.activeElement && document.activeElement.blur(); window.print(); };
 
+  /* ---------- dark / light mode ---------- */
+  const LS_THEME = 'sinv_theme';
+  function applyTheme(t){
+    document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+    $('themeBtn').textContent = t === 'dark' ? '☀️ Light' : '🌙 Dark';
+  }
+  window.toggleTheme = function(){
+    const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    try{ localStorage.setItem(LS_THEME, t); }catch(e){}
+    applyTheme(t);
+  };
+
   /* ---------- auth-aware footer ---------- */
   const escapeHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   window.applyRoleToUI = function(){
@@ -1301,6 +1354,7 @@ United States</div>
   if(window.SV_ROLE) window.applyRoleToUI(); // auth may have resolved before this script ran
 
   /* ---------- init ---------- */
+  try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
   loadCompany();
   refreshList('');
   refreshCustList('');
