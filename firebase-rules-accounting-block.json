@@ -1,0 +1,24 @@
+{
+  "_readme": [
+    "ADDITIVE rules block for the Accounting app (invoice.html).",
+    "The philinity project shares ONE database + ONE rules file across apps",
+    "(Eats, Cellar, Taskboard, ...). Add ONLY the 'accounting' block below as a",
+    "sibling of the existing app blocks inside rules -> DO NOT drop, overwrite,",
+    "or wildcard any other app's block. Verify the other blocks are intact",
+    "after publishing.",
+    "",
+    "Access model: any signed-in Google user can read/write /accounting, same",
+    "as Cellar's /cellar block. App-level authorization is enforced by the",
+    "sign-in gate (roster at taskboard/access + root-admin UIDs); RTDB email",
+    "transforms can't reproduce the app's emailToKey sanitization reliably",
+    "(rules .replace is first-occurrence-only), so mirror Cellar's approach.",
+    "",
+    "Data shape: /accounting/data/<key> where each key is ONE JSON string",
+    "(sinv_company, sinv_seq, sinv_docs, sinv_custs, sinv_items, sinv_set,",
+    "sinv_exp, sinv_style, sinv_tpls)."
+  ],
+  "accounting": {
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
