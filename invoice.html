@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.5 -->
+<!-- Accounting (Simple Invoicing) v3.0 — data lives in Firebase RTDB under /accounting -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -11,7 +11,7 @@
 // Users are resolved against taskboard/access/{emailKey}, so anyone who can
 // sign in to the Task Board can sign in here — one roster for both apps.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getDatabase, ref, set, get } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -84,8 +84,10 @@ window.doSignOut = async function() {
 window._fbSet = set;
 window._fbGet = get;
 window._fbRefFn = ref;
+window._fbOnValue = onValue;
 window._fbDb = db;
 window._fbAuth = auth;
+window._fbReady = true;
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
@@ -105,6 +107,7 @@ onAuthStateChanged(auth, async (user) => {
   document.getElementById('auth-gate').style.display = 'none';
   document.body.style.overflow = '';
   if (typeof window.applyRoleToUI === 'function') window.applyRoleToUI();
+  if (typeof window.attachAccountingSync === 'function') window.attachAccountingSync();
 });
 </script>
 <style>
@@ -413,7 +416,7 @@ onAuthStateChanged(auth, async (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center"></div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 2.0</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 3.0</div>
   </div>
 </div>
 
@@ -645,7 +648,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v2.1</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.0</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -668,8 +671,91 @@ United States</div>
     inp.style.fontSize = n > 32 ? '11px' : n > 26 ? '12px' : n > 21 ? '13px' : '';
   };
 
-  function lsGet(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)||'null') || fallback; }catch(e){ return fallback; } }
-  function lsPut(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ alert('Could not save (storage unavailable or full).'); } }
+  /* ---------- storage: Firebase RTDB (/accounting/data/<key>) with a local
+     cache. Each key's value is stored as ONE JSON string (invoice numbers can
+     contain characters RTDB path segments reject, so leaves are opaque).
+     localStorage doubles as the offline/last-known copy; on first sync any
+     key that's empty in the cloud is migrated up from this device. ---------- */
+  const DATA_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp','sinv_style','sinv_tpls'];
+  const DB = {}; // key -> JSON string (authoritative in-memory copy)
+  DATA_KEYS.forEach(k=>{ try{ const v = localStorage.getItem(k); if(v != null) DB[k] = v; }catch(e){} });
+
+  function getRaw(key){
+    if(DB[key] != null) return DB[key];
+    try{ return localStorage.getItem(key); }catch(e){ return null; }
+  }
+  function putRaw(key, str){
+    DB[key] = str;
+    try{ localStorage.setItem(key, str); }catch(e){}
+    if(window._fbReady && window.SV_ROLE){
+      try{
+        window._fbSet(window._fbRefFn(window._fbDb, 'accounting/data/' + key), str)
+          .catch(err=>{ console.error('Cloud save failed (' + key + '):', err); syncNote('⚠️ Cloud save failed — kept on this device'); });
+      }catch(e){}
+    }
+  }
+  function delRaw(key){
+    delete DB[key];
+    try{ localStorage.removeItem(key); }catch(e){}
+    if(window._fbReady && window.SV_ROLE){
+      try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/data/' + key), null).catch(()=>{}); }catch(e){}
+    }
+  }
+  function lsGet(key, fallback){ try{ return JSON.parse(getRaw(key)||'null') || fallback; }catch(e){ return fallback; } }
+  function lsPut(key, val){ putRaw(key, JSON.stringify(val)); }
+
+  let _syncNoteTimer = null;
+  function syncNote(msg){
+    let n = $('syncNote');
+    if(!n){
+      n = document.createElement('div'); n.id = 'syncNote'; n.className = 'noprint';
+      n.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:300;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font-size:13px;box-shadow:0 4px 16px rgba(0,0,0,.2)';
+      document.body.appendChild(n);
+    }
+    n.textContent = msg; n.style.display = 'block';
+    clearTimeout(_syncNoteTimer);
+    _syncNoteTimer = setTimeout(()=>{ n.style.display = 'none'; }, 3000);
+  }
+
+  // re-render whatever a synced key drives (called when another device changed it)
+  function refreshFromData(key){
+    if(key === 'sinv_docs') refreshList($('savedList').value);
+    if(key === 'sinv_custs') refreshCustList($('custList').value);
+    if(key === 'sinv_items') refreshDL();
+    if(key === 'sinv_company') loadCompany();
+    if(key === 'sinv_style' || key === 'sinv_company') applyDesign();
+    if(key === 'sinv_set'){
+      const s = settings();
+      applyColW(Array.isArray(s.colW) && s.colW.length === 5 ? s.colW : DEFAULT_COLW);
+      recalc();
+    }
+    if(document.body.classList.contains('reporting')) buildReport();
+  }
+  let _syncAttached = false;
+  window.attachAccountingSync = function(){
+    if(_syncAttached || !window._fbOnValue) return;
+    _syncAttached = true;
+    let announced = false;
+    DATA_KEYS.forEach(k=>{
+      window._fbOnValue(window._fbRefFn(window._fbDb, 'accounting/data/' + k), snap=>{
+        const remote = snap.val();
+        if(remote == null){
+          // nothing in the cloud yet for this key — migrate this device's copy up
+          if(DB[k] != null) putRaw(k, DB[k]);
+          return;
+        }
+        if(typeof remote !== 'string' || remote === DB[k]) return; // echo of our own write
+        DB[k] = remote;
+        try{ localStorage.setItem(k, remote); }catch(e){}
+        refreshFromData(k);
+        if(!announced){ announced = true; syncNote('Synced ☁️'); }
+      }, err=>{
+        console.error('Sync listener failed (' + k + '):', err);
+        syncNote('⚠️ Offline — using this device\'s data');
+      });
+    });
+    syncNote('Synced ☁️');
+  };
 
   const docs     = () => lsGet(LS_DOCS, {});
   const custs    = () => lsGet(LS_CUST, {});
@@ -877,7 +963,7 @@ United States</div>
     };
     if(includeScreen) consider($('invNum').textContent);
     Object.keys(docs()).forEach(consider);
-    try{ const s = parseInt(localStorage.getItem(LS_SEQ)||'',10); if(s > bestN){ bestN = s; best = String(s); } }catch(e){}
+    try{ const s = parseInt(getRaw(LS_SEQ)||'',10); if(s > bestN){ bestN = s; best = String(s); } }catch(e){}
     return { best: best, bestN: bestN };
   }
   function bumpFrom(r){
@@ -888,7 +974,7 @@ United States</div>
   function nextNumber(){
     const r = scanBest(true);
     const n = bumpFrom(r);
-    if(r.best !== null) try{ localStorage.setItem(LS_SEQ, String(r.bestN + 1)); }catch(e){}
+    if(r.best !== null) putRaw(LS_SEQ, String(r.bestN + 1));
     return n;
   }
   // like nextNumber but ignores the unsaved invoice on screen and reserves nothing
@@ -1769,7 +1855,7 @@ United States</div>
     const status = $('sv-data-status');
     try{
       const data = {};
-      SV_KEYS.forEach(k=>{ const v = localStorage.getItem(k); if(v != null) data[k] = v; });
+      SV_KEYS.forEach(k=>{ const v = getRaw(k); if(v != null) data[k] = v; });
       const seed = '<scr'+'ipt id="sv-seed">(function(){try{var d=' +
         JSON.stringify(JSON.stringify(data)) +
         ';d=JSON.parse(d);for(var k in d){if(localStorage.getItem(k)==null)localStorage.setItem(k,d[k]);}}catch(e){}})();</scr'+'ipt>';
@@ -1783,8 +1869,8 @@ United States</div>
   window.svBackupJSON = function(){
     const status = $('sv-data-status');
     try{
-      const backup = { app:'accounting', version:'2.0', exportedAt:new Date().toISOString(), data:{} };
-      SV_KEYS.forEach(k=>{ const v = localStorage.getItem(k); if(v != null) backup.data[k] = v; });
+      const backup = { app:'accounting', version:'3.0', exportedAt:new Date().toISOString(), data:{} };
+      SV_KEYS.forEach(k=>{ const v = getRaw(k); if(v != null) backup.data[k] = v; });
       const name = download('accounting-backup-' + stamp() + '.json', JSON.stringify(backup, null, 2), 'application/json');
       status.innerHTML = '<span style="color:#4ade80">✅ Backup saved: ' + name + '</span>';
     }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
@@ -1813,10 +1899,10 @@ United States</div>
       try{
         const backup = JSON.parse(reader.result);
         if(!backup || backup.app !== 'accounting' || !backup.data) throw new Error('Not an accounting backup file');
-        if(!confirm('Restore backup from ' + (backup.exportedAt||'unknown date') + '? This replaces the data on this device.')) return;
+        if(!confirm('Restore backup from ' + (backup.exportedAt||'unknown date') + '? This replaces the current data (including the cloud copy for everyone).')) return;
         SV_KEYS.forEach(k=>{
-          if(backup.data[k] != null) localStorage.setItem(k, backup.data[k]);
-          else localStorage.removeItem(k);
+          if(backup.data[k] != null) putRaw(k, backup.data[k]);
+          else delRaw(k);
         });
         status.innerHTML = '<span style="color:#4ade80">✅ Restored — reloading…</span>';
         setTimeout(()=>location.reload(), 600);
