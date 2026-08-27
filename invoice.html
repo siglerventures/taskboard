@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.0 — data lives in Firebase RTDB under /accounting -->
+<!-- Accounting (Simple Invoicing) v3.1 — data lives in Firebase RTDB under /accounting; multi-business -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -416,12 +416,13 @@ onAuthStateChanged(auth, async (user) => {
     <div style="font-size:13px;color:#64748b;text-align:center">Sign in to continue</div>
     <button onclick="googleSignIn()" style="background:#6366f1;color:#fff;border:none;padding:14px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;width:100%;-webkit-appearance:none;margin-top:8px">Sign in with Google</button>
     <div id="pw-error" style="color:#f87171;font-size:13px;display:none;text-align:center"></div>
-    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 3.0</div>
+    <div style="font-size:11px;color:#475569;text-align:center">Stays logged in for 30 days · Version 3.1</div>
   </div>
 </div>
 
 <div class="toolbar">
   <a class="brand" href="#" title="Back to a fresh invoice" onclick="window.goHome(); return false;">🏚️ Main</a>
+  <select id="bizList" onchange="window.bizChanged()" title="Switch business"></select>
   <select id="savedList" onchange="window.loadSelected()"><option value="">— Saved invoices —</option></select>
   <select id="custList" onchange="window.loadCustomer()"><option value="">— Customers —</option></select>
   <button onclick="window.newInvoice()">➕ New Invoice</button>
@@ -591,6 +592,12 @@ United States</div>
     <div style="font-size:12px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:20px">Backup · Export · Restore</div>
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:3px">🏢 This Business</div>
+        <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Backups and exports below cover the business currently selected in the toolbar</div>
+        <button onclick="window.renameBusiness()" style="background:#334155;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">✏️ Rename Business</button>
+        <button onclick="window.deleteBusiness()" style="background:#1c0a0a;border:0.5px solid #7f1d1d;color:#f87171;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">🗑 Delete Business</button>
+      </div>
+      <div style="background:#0f172a;border:1px solid #334155;border-radius:10px;padding:16px">
         <div style="font-size:14px;font-weight:600;margin-bottom:3px">🌐 Full Backup (HTML)</div>
         <div style="font-size:12px;color:#94a3b8;margin-bottom:12px">Save the whole app as one HTML file — keeps the exact look &amp; flow.</div>
         <button onclick="svBackupHTML()" style="background:#6366f1;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600">⬇️ Download HTML Backup</button>
@@ -648,7 +655,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.0</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.1</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -677,30 +684,123 @@ United States</div>
      localStorage doubles as the offline/last-known copy; on first sync any
      key that's empty in the cloud is migrated up from this device. ---------- */
   const DATA_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp','sinv_style','sinv_tpls'];
-  const DB = {}; // key -> JSON string (authoritative in-memory copy)
-  DATA_KEYS.forEach(k=>{ try{ const v = localStorage.getItem(k); if(v != null) DB[k] = v; }catch(e){} });
+
+  /* Multi-business: every business has its own copy of every data key.
+     The original data is business 'main' and keeps its original paths
+     (accounting/data/<key>, unprefixed localStorage) so nothing moves;
+     other businesses live at accounting/biz/<id>/<key> and local keys
+     biz:<id>:<key>. The registry of businesses is shared at
+     accounting/businesses; which business THIS device is looking at is
+     a local preference (sinv_curbiz). */
+  const LS_CURBIZ = 'sinv_curbiz';
+  const REG_LKEY = 'sinv_bizlist';
+  let CUR_BIZ = 'main';
+  try{ CUR_BIZ = localStorage.getItem(LS_CURBIZ) || 'main'; }catch(e){}
+  const lk = k => CUR_BIZ === 'main' ? k : 'biz:' + CUR_BIZ + ':' + k;
+  const cloudPath = k => 'accounting/' + (CUR_BIZ === 'main' ? 'data/' : 'biz/' + CUR_BIZ + '/') + k;
+
+  const DB = {}; // logical key -> JSON string (authoritative in-memory copy)
+  DATA_KEYS.forEach(k=>{ try{ const v = localStorage.getItem(lk(k)); if(v != null) DB[k] = v; }catch(e){} });
 
   function getRaw(key){
     if(DB[key] != null) return DB[key];
-    try{ return localStorage.getItem(key); }catch(e){ return null; }
+    try{ return localStorage.getItem(lk(key)); }catch(e){ return null; }
   }
   function putRaw(key, str){
     DB[key] = str;
-    try{ localStorage.setItem(key, str); }catch(e){}
+    try{ localStorage.setItem(lk(key), str); }catch(e){}
     if(window._fbReady && window.SV_ROLE){
       try{
-        window._fbSet(window._fbRefFn(window._fbDb, 'accounting/data/' + key), str)
+        window._fbSet(window._fbRefFn(window._fbDb, cloudPath(key)), str)
           .catch(err=>{ console.error('Cloud save failed (' + key + '):', err); syncNote('⚠️ Cloud save failed — kept on this device'); });
       }catch(e){}
     }
   }
   function delRaw(key){
     delete DB[key];
-    try{ localStorage.removeItem(key); }catch(e){}
+    try{ localStorage.removeItem(lk(key)); }catch(e){}
     if(window._fbReady && window.SV_ROLE){
-      try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/data/' + key), null).catch(()=>{}); }catch(e){}
+      try{ window._fbSet(window._fbRefFn(window._fbDb, cloudPath(key)), null).catch(()=>{}); }catch(e){}
     }
   }
+
+  /* ---------- business registry & switching ---------- */
+  function regGet(){
+    try{ return JSON.parse(localStorage.getItem(REG_LKEY)||'null') || { main:{ name:'My Business' } }; }
+    catch(e){ return { main:{ name:'My Business' } }; }
+  }
+  function regPut(o){
+    const s = JSON.stringify(o);
+    try{ localStorage.setItem(REG_LKEY, s); }catch(e){}
+    if(window._fbReady && window.SV_ROLE){
+      try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/businesses'), s).catch(()=>{}); }catch(e){}
+    }
+    refreshBizList();
+  }
+  function refreshBizList(){
+    const s = $('bizList');
+    if(!s) return;
+    const reg = regGet();
+    s.innerHTML = '';
+    Object.keys(reg).sort((a,b)=>(reg[a].name||'').localeCompare(reg[b].name||'')).forEach(id=>{
+      const o = document.createElement('option'); o.value = id; o.textContent = '🏢 ' + (reg[id].name || id); s.appendChild(o);
+    });
+    const n = document.createElement('option'); n.value = '__new'; n.textContent = '＋ New Business…'; s.appendChild(n);
+    s.value = reg[CUR_BIZ] ? CUR_BIZ : 'main';
+  }
+  window.bizChanged = function(){
+    const v = $('bizList').value;
+    if(v === '__new'){ refreshBizList(); window.newBusiness(); return; }
+    if(v && v !== CUR_BIZ){
+      try{ localStorage.setItem(LS_CURBIZ, v); }catch(e){}
+      location.reload();
+    }
+  };
+  window.newBusiness = function(){
+    const name = prompt('Name of the new business:', '');
+    if(name == null || !name.trim()) return;
+    const id = 'b' + Date.now().toString(36);
+    const reg = regGet();
+    reg[id] = { name: name.trim() };
+    regPut(reg);
+    if(confirm('Copy the current design (logo, colors, layout, letterhead) to "' + name.trim() + '"?')){
+      ['sinv_style','sinv_company'].forEach(k=>{
+        const v = getRaw(k);
+        if(v == null) return;
+        try{ localStorage.setItem('biz:' + id + ':' + k, v); }catch(e){}
+        if(window._fbReady && window.SV_ROLE){
+          try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/biz/' + id + '/' + k), v).catch(()=>{}); }catch(e){}
+        }
+      });
+    }
+    try{ localStorage.setItem(LS_CURBIZ, id); }catch(e){}
+    location.reload();
+  };
+  window.renameBusiness = function(){
+    const reg = regGet();
+    const cur = reg[CUR_BIZ] || { name:'My Business' };
+    const name = prompt('Rename this business:', cur.name || '');
+    if(name == null || !name.trim()) return;
+    cur.name = name.trim();
+    reg[CUR_BIZ] = cur;
+    regPut(reg);
+    syncNote('Business renamed');
+  };
+  window.deleteBusiness = function(){
+    if(CUR_BIZ === 'main'){ alert('The original business can\'t be deleted.'); return; }
+    const reg = regGet();
+    const name = (reg[CUR_BIZ] && reg[CUR_BIZ].name) || CUR_BIZ;
+    if(!confirm('Delete business "' + name + '" AND all of its invoices, customers, items, and expenses — for everyone? This cannot be undone.')) return;
+    if(!confirm('Really delete "' + name + '"? Consider downloading a backup from 📦 Data first.')) return;
+    delete reg[CUR_BIZ];
+    regPut(reg);
+    DATA_KEYS.forEach(k=>{ try{ localStorage.removeItem('biz:' + CUR_BIZ + ':' + k); }catch(e){} });
+    if(window._fbReady && window.SV_ROLE){
+      try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/biz/' + CUR_BIZ), null).catch(()=>{}); }catch(e){}
+    }
+    try{ localStorage.setItem(LS_CURBIZ, 'main'); }catch(e){}
+    location.reload();
+  };
   function lsGet(key, fallback){ try{ return JSON.parse(getRaw(key)||'null') || fallback; }catch(e){ return fallback; } }
   function lsPut(key, val){ putRaw(key, JSON.stringify(val)); }
 
@@ -736,8 +836,17 @@ United States</div>
     if(_syncAttached || !window._fbOnValue) return;
     _syncAttached = true;
     let announced = false;
+    // shared business registry
+    window._fbOnValue(window._fbRefFn(window._fbDb, 'accounting/businesses'), snap=>{
+      const remote = snap.val();
+      if(remote == null){ regPut(regGet()); return; } // seed the registry
+      if(typeof remote !== 'string') return;
+      try{ if(remote === localStorage.getItem(REG_LKEY)) return; }catch(e){}
+      try{ localStorage.setItem(REG_LKEY, remote); }catch(e){}
+      refreshBizList();
+    }, ()=>{});
     DATA_KEYS.forEach(k=>{
-      window._fbOnValue(window._fbRefFn(window._fbDb, 'accounting/data/' + k), snap=>{
+      window._fbOnValue(window._fbRefFn(window._fbDb, cloudPath(k)), snap=>{
         const remote = snap.val();
         if(remote == null){
           // nothing in the cloud yet for this key — migrate this device's copy up
@@ -746,7 +855,7 @@ United States</div>
         }
         if(typeof remote !== 'string' || remote === DB[k]) return; // echo of our own write
         DB[k] = remote;
-        try{ localStorage.setItem(k, remote); }catch(e){}
+        try{ localStorage.setItem(lk(k), remote); }catch(e){}
         refreshFromData(k);
         if(!announced){ announced = true; syncNote('Synced ☁️'); }
       }, err=>{
@@ -1848,6 +1957,10 @@ United States</div>
     return name;
   }
   const stamp = () => new Date().toISOString().slice(0,10);
+  const bizSlug = () => {
+    const n = (regGet()[CUR_BIZ] || {}).name || 'business';
+    return n.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'business';
+  };
   // One self-contained HTML file: the app as it stands, with a seed script in
   // <head> that loads today's data into localStorage when the file is opened
   // (only into empty keys, so it never clobbers live data on this site).
@@ -1862,7 +1975,7 @@ United States</div>
       let html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
       html = html.replace(/<script id="sv-seed">[\s\S]*?<\/script>/, ''); // don't stack seeds on re-backup
       html = html.replace(/<head>/i, '<head>' + seed);
-      const name = download('accounting-backup-' + stamp() + '.html', html, 'text/html');
+      const name = download('accounting-' + bizSlug() + '-backup-' + stamp() + '.html', html, 'text/html');
       status.innerHTML = '<span style="color:#4ade80">✅ HTML backup saved: ' + name + '</span>';
     }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
   };
@@ -1871,7 +1984,7 @@ United States</div>
     try{
       const backup = { app:'accounting', version:'3.0', exportedAt:new Date().toISOString(), data:{} };
       SV_KEYS.forEach(k=>{ const v = getRaw(k); if(v != null) backup.data[k] = v; });
-      const name = download('accounting-backup-' + stamp() + '.json', JSON.stringify(backup, null, 2), 'application/json');
+      const name = download('accounting-' + bizSlug() + '-backup-' + stamp() + '.json', JSON.stringify(backup, null, 2), 'application/json');
       status.innerHTML = '<span style="color:#4ade80">✅ Backup saved: ' + name + '</span>';
     }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
   };
@@ -1885,7 +1998,7 @@ United States</div>
         const r = d[k]; const t = docTotals(r);
         rows.push([q(k), q(docCustomer(r)), q(r.date||''), q(r.due||''), t.total.toFixed(2), t.tax.toFixed(2), r.paid?'yes':'no', q(r.paidDate||'')].join(','));
       });
-      const name = download('accounting-invoices-' + stamp() + '.csv', rows.join('\n'), 'text/csv');
+      const name = download('accounting-' + bizSlug() + '-invoices-' + stamp() + '.csv', rows.join('\n'), 'text/csv');
       status.innerHTML = '<span style="color:#4ade80">✅ CSV saved: ' + name + '</span>';
     }catch(e){ status.innerHTML = '<span style="color:#f87171">❌ Error: ' + escapeHtml(e.message) + '</span>'; }
   };
@@ -1986,6 +2099,7 @@ United States</div>
 
   /* ---------- init ---------- */
   try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
+  refreshBizList();
   initColResizers();
   loadCompany();
   applyDesign();
