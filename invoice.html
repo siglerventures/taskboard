@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.3 -->
+<!-- Accounting (Simple Invoicing) v2.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -195,6 +195,22 @@ onAuthStateChanged(auth, async (user) => {
     text-align:center; cursor:nwse-resize; color:var(--muted); opacity:0; user-select:none; touch-action:none;
   }
   .ov:hover .ov-drag, .ov:hover .ov-size{ opacity:1; }
+
+  /* built-in blocks (customer, notes, footer, company address) get the same
+     move/resize handles as overlays */
+  .rz-host{ position:relative; }
+  .rz-host:hover{ outline:1px dashed var(--edit-ring); }
+  .rz-host.free{ position:absolute; z-index:5; }
+  .rz-size{
+    position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; font-size:11px; line-height:15px;
+    text-align:center; cursor:nwse-resize; color:var(--muted); opacity:0; user-select:none; touch-action:none;
+  }
+  .rz-drag{
+    position:absolute; top:-16px; left:-2px; font-size:12px; line-height:1; cursor:grab;
+    color:var(--muted); background:var(--panel); border:1px solid var(--line);
+    border-radius:4px; padding:2px 4px; opacity:0; user-select:none; touch-action:none;
+  }
+  .rz-host:hover .rz-size, .rz-host:hover .rz-drag{ opacity:1; }
 
   /* logo slot in the letterhead */
   #coLogo{ display:none; height:56px; max-width:240px; object-fit:contain; }
@@ -841,7 +857,7 @@ United States</div>
   const CO_FIELDS = ['coName','coTag','coAddr','foot'];
   function saveCompany(){
     const o = {};
-    CO_FIELDS.forEach(id => o[id] = $(id).innerHTML);
+    CO_FIELDS.forEach(id => o[id] = cleanHTML($(id)));
     lsPut(LS_CO, o);
   }
   function loadCompany(){
@@ -883,7 +899,7 @@ United States</div>
     const name = custName();
     if(!name) return;
     const c = custs();
-    c[name] = $('customer').innerHTML;
+    c[name] = cleanHTML($('customer'));
     lsPut(LS_CUST, c);
     refreshCustList(name);
   }
@@ -896,7 +912,7 @@ United States</div>
     if(!key) return;
     exitReport();
     const c = custs()[key];
-    if(c != null) $('customer').innerHTML = c;
+    if(c != null){ $('customer').innerHTML = c; applyBlocks(); }
   };
   function refreshCustList(sel){
     const c = custs();
@@ -987,6 +1003,7 @@ United States</div>
     $('savedList').value = '';
     $('custList').value = '';
     setPaidUI(false);
+    applyBlocks();
   }
   window.newInvoice = function(){ resetInvoice(nextNumber()); };
   // Main: back to the home screen — a clean invoice at the next unsaved number
@@ -1004,7 +1021,7 @@ United States</div>
       label:'Invoice #' + key + (cn ? ' - ' + cn : ''),
       date:$('mDate').textContent, due:$('mDue').textContent,
       ref:$('mRef').textContent,
-      customer:$('customer').innerHTML, notes:$('notes').innerHTML,
+      customer:cleanHTML($('customer')), notes:cleanHTML($('notes')),
       sub:t.sub, tax:t.tax, total:t.total, taxRate:t.rate,
       paid:!!prev.paid, paidDate:prev.paidDate || null,
       rows: Array.from($('rows').querySelectorAll('tr')).map(tr=>({
@@ -1036,6 +1053,7 @@ United States</div>
     (rec.rows&&rec.rows.length?rec.rows:[{item:'',desc:'',qty:'1',price:'0.00'}])
       .forEach(r=>$('rows').appendChild(rowHtml(r.item, r.desc, r.qty, r.price, r.taxable)));
     setPaidUI(!!rec.paid);
+    applyBlocks();
     recalc();
   };
 
@@ -1325,7 +1343,93 @@ United States</div>
     const logo = $('coLogo');
     if(lg.src){ logo.src = lg.src; logo.style.display = 'block'; logo.style.height = (lg.h || 56) + 'px'; }
     else { logo.style.display = 'none'; logo.removeAttribute('src'); }
+    applyBlocks();
     renderOverlays();
+  }
+
+  /* ---------- movable/resizable built-in blocks ---------- */
+  const BLOCK_KEYS = ['customer','notes','foot','coAddr'];
+  function putBlock(k, patch){
+    const st = styleStore();
+    st.blocks = st.blocks || {};
+    st.blocks[k] = Object.assign({}, st.blocks[k] || {}, patch);
+    putStyleStore(st);
+  }
+  // strip the hover handles before a block's HTML is stored anywhere
+  function cleanHTML(el){
+    const c = el.cloneNode(true);
+    c.querySelectorAll('.rz-size,.rz-drag').forEach(n=>n.remove());
+    return c.innerHTML;
+  }
+  function applyBlocks(){
+    const bl = styleStore().blocks || {};
+    BLOCK_KEYS.forEach(k=>{
+      const el = skEl(k);
+      if(!el) return;
+      el.classList.add('rz-host');
+      const b = bl[k] || {};
+      el.style.width = b.w ? b.w + '%' : '';
+      if(b.free){
+        el.classList.add('free');
+        el.style.left = (b.x != null ? b.x : 5) + '%';
+        el.style.top = (b.y != null ? b.y : 100) + 'px';
+      } else {
+        el.classList.remove('free');
+        el.style.left = ''; el.style.top = '';
+      }
+      attachBlockHandles(el, k);
+    });
+  }
+  function attachBlockHandles(el, k){
+    if(el.querySelector(':scope > .rz-size')) return;
+    const rh = document.createElement('div');
+    rh.className = 'rz-size noprint'; rh.textContent = '◢'; rh.title = 'Drag to resize width'; rh.contentEditable = 'false';
+    const dh = document.createElement('div');
+    dh.className = 'rz-drag noprint'; dh.textContent = '⠿'; dh.title = 'Drag to move anywhere on the page'; dh.contentEditable = 'false';
+    el.appendChild(rh); el.appendChild(dh);
+    rh.addEventListener('pointerdown', e=>{
+      e.preventDefault(); e.stopPropagation();
+      rh.setPointerCapture(e.pointerId);
+      const sheet = $('invSheet').getBoundingClientRect();
+      const w0 = el.getBoundingClientRect().width / sheet.width * 100;
+      const startX = e.clientX;
+      const move = ev=>{
+        const w = Math.min(100, Math.max(8, w0 + (ev.clientX - startX) / sheet.width * 100));
+        el.style.width = w + '%';
+      };
+      const up = ()=>{
+        rh.removeEventListener('pointermove', move); rh.removeEventListener('pointerup', up);
+        putBlock(k, { w: Math.round(parseFloat(el.style.width) * 10) / 10 });
+      };
+      rh.addEventListener('pointermove', move); rh.addEventListener('pointerup', up);
+    });
+    dh.addEventListener('pointerdown', e=>{
+      e.preventDefault(); e.stopPropagation();
+      dh.setPointerCapture(e.pointerId);
+      const sheet = $('invSheet').getBoundingClientRect();
+      const r0 = el.getBoundingClientRect();
+      if(!el.classList.contains('free')){
+        // first drag pops the block out of the layout at its current spot
+        putBlock(k, {
+          free: true,
+          x: Math.round((r0.left - sheet.left) / sheet.width * 1000) / 10,
+          y: Math.round(r0.top - sheet.top),
+          w: Math.round(r0.width / sheet.width * 1000) / 10
+        });
+        applyBlocks();
+      }
+      const x0 = parseFloat(el.style.left), y0 = parseFloat(el.style.top);
+      const startX = e.clientX, startY = e.clientY;
+      const move = ev=>{
+        el.style.left = Math.min(96, Math.max(-5, x0 + (ev.clientX - startX) / sheet.width * 100)) + '%';
+        el.style.top = Math.max(0, y0 + (ev.clientY - startY)) + 'px';
+      };
+      const up = ()=>{
+        dh.removeEventListener('pointermove', move); dh.removeEventListener('pointerup', up);
+        putBlock(k, { x: Math.round(parseFloat(el.style.left) * 10) / 10, y: Math.round(parseFloat(el.style.top)) });
+      };
+      dh.addEventListener('pointermove', move); dh.addEventListener('pointerup', up);
+    });
   }
   function setStyleProp(key, prop, val){
     const st = styleStore();
@@ -1449,6 +1553,8 @@ United States</div>
       parts.push('<label class="srow">Text color <input type="color" data-sty="c" value="' + rgbToHex(getComputedStyle(el).color) + '"></label>');
       if(BG_KEYS.includes(key))
         parts.push('<label class="srow">Background <input type="color" data-sty="bg" value="' + rgbToHex(getComputedStyle(el).backgroundColor) + '"></label>');
+      if(BLOCK_KEYS.includes(key))
+        parts.push('<button data-act="blockreset">🔒 Reset position &amp; size</button>');
     }
     if(kind === 'skey' && key === 'wave'){
       const st = styleStore(), w = st.wave || {};
@@ -1507,6 +1613,12 @@ United States</div>
           const el = skEl(key);
           const nv = prompt('New label for "' + el.textContent.trim() + '":', el.textContent.trim());
           if(nv != null && nv.trim() !== '') setStyleProp(key, 'label', nv.trim());
+        }
+        if(act === 'blockreset'){
+          const st = styleStore();
+          if(st.blocks) delete st.blocks[key];
+          putStyleStore(st);
+          applyBlocks();
         }
         if(act === 'logo') $('logoFile').click();
         if(act === 'logodel'){ const st = styleStore(); delete st.logo; putStyleStore(st); applyDesign(); }
@@ -1739,8 +1851,8 @@ United States</div>
   /* ---------- init ---------- */
   try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
   initColResizers();
-  applyDesign();
   loadCompany();
+  applyDesign();
   refreshList('');
   refreshCustList('');
   refreshDL();
