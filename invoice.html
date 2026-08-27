@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.2 -->
+<!-- Accounting (Simple Invoicing) v2.3 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -176,8 +176,36 @@ onAuthStateChanged(auth, async (user) => {
   .sheet{
     width:8.5in; max-width:100%; min-height:10in; margin:18px auto 40px;
     background:var(--sheet); box-shadow:0 2px 14px rgba(0,0,0,.12);
-    display:flex; flex-direction:column;
+    display:flex; flex-direction:column; position:relative;
   }
+
+  /* free-floating overlays (text boxes / images) */
+  #ovLayer{ position:absolute; inset:0; pointer-events:none; z-index:6; }
+  .ov{ position:absolute; pointer-events:auto; min-width:36px; }
+  .ov:hover{ outline:1px dashed var(--edit-ring); }
+  .ov-text .ov-body{ outline:none; font-size:14.5px; padding:3px 6px; min-height:1em; overflow-wrap:break-word; }
+  .ov-img img{ display:block; width:100%; }
+  .ov-drag{
+    position:absolute; top:-16px; left:-2px; font-size:12px; line-height:1; cursor:grab;
+    color:var(--muted); background:var(--panel); border:1px solid var(--line);
+    border-radius:4px; padding:2px 4px; opacity:0; user-select:none; touch-action:none;
+  }
+  .ov-size{
+    position:absolute; right:-7px; bottom:-7px; width:15px; height:15px; font-size:11px; line-height:15px;
+    text-align:center; cursor:nwse-resize; color:var(--muted); opacity:0; user-select:none; touch-action:none;
+  }
+  .ov:hover .ov-drag, .ov:hover .ov-size{ opacity:1; }
+
+  /* logo slot in the letterhead */
+  #coLogo{ display:none; height:56px; max-width:240px; object-fit:contain; }
+
+  /* style popover rows */
+  .ctx .ttl{ font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--muted); padding:7px 12px 3px; }
+  .ctx label.srow{ display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; padding:7px 12px; color:var(--ink); cursor:pointer; }
+  .ctx label.srow:hover{ background:var(--band); border-radius:6px; }
+  .ctx input[type=color]{ width:36px; height:24px; border:1px solid var(--line); border-radius:4px; background:none; padding:0; cursor:pointer; }
+  .ctx input[type=range]{ width:110px; }
+  .ctx hr{ border:none; border-top:1px solid var(--line); margin:4px 8px; }
 
   /* header with lavender wave */
   .head{ position:relative; padding:28px 40px 0; }
@@ -387,21 +415,24 @@ onAuthStateChanged(auth, async (user) => {
   <button id="themeBtn" onclick="window.toggleTheme()" title="Switch dark / light mode">🌙 Dark</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder; drag the dividers between column headers to resize columns (double-click a divider to reset). 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder; drag the dividers between column headers to resize columns (double-click a divider to reset). Right-click labels, the wave, or anywhere on the invoice to rename, recolor, upload a logo, or add movable text boxes and images. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
 
 <div class="sheet inv" id="invSheet">
   <div class="head">
     <div class="row">
-      <div>
-        <div class="company-name" id="coName" contenteditable="true">computer<span class="accent">central</span></div>
-        <div class="tagline" id="coTag" contenteditable="true">Your Technical Solution Provider</div>
+      <div style="display:flex;align-items:center;gap:14px">
+        <img id="coLogo" alt="Logo">
+        <div>
+          <div class="company-name" id="coName" data-skey="coName" contenteditable="true">computer<span class="accent">central</span></div>
+          <div class="tagline" id="coTag" data-skey="coTag" contenteditable="true">Your Technical Solution Provider</div>
+        </div>
       </div>
-      <div class="company-addr" id="coAddr" contenteditable="true">Computer Central
+      <div class="company-addr" id="coAddr" data-skey="coAddr" contenteditable="true">Computer Central
 1550 S Cloverdale Rd
 Boise ID 83709-1128
 United States</div>
     </div>
-    <div class="wave">
+    <div class="wave" data-skey="wave">
       <svg viewBox="0 0 800 70" preserveAspectRatio="none" aria-hidden="true">
         <path d="M0,10 C200,80 420,-30 800,45 L800,52 C420,-22 200,88 0,18 Z" fill="#e6e0f8"></path>
         <path d="M0,14 C200,84 420,-26 800,49 L800,70 L0,70 Z" fill="#ffffff"></path>
@@ -412,17 +443,17 @@ United States</div>
   </div>
 
   <div class="body">
-    <div class="customer" id="customer" contenteditable="true">Customer Name
+    <div class="customer" id="customer" data-skey="customer" contenteditable="true">Customer Name
 Street Address
 City, ST 00000
 United States</div>
 
-    <h1 class="invnum">Invoice <span id="invNum" contenteditable="true">1000</span></h1>
+    <h1 class="invnum"><span data-skey="lbl-invoice">Invoice</span> <span id="invNum" contenteditable="true">1000</span></h1>
 
-    <div class="meta">
-      <div><div class="k">Invoice Date</div><div class="v" id="mDate" contenteditable="true"></div></div>
-      <div><div class="k">Due Date</div><div class="v" id="mDue" contenteditable="true"></div></div>
-      <div><div class="k">Reference</div><div class="v" id="mRef" contenteditable="true"></div></div>
+    <div class="meta" data-skey="meta">
+      <div><div class="k" data-skey="mk-date">Invoice Date</div><div class="v" id="mDate" contenteditable="true"></div></div>
+      <div><div class="k" data-skey="mk-due">Due Date</div><div class="v" id="mDue" contenteditable="true"></div></div>
+      <div><div class="k" data-skey="mk-ref">Reference</div><div class="v" id="mRef" contenteditable="true"></div></div>
     </div>
 
     <table class="items">
@@ -432,30 +463,31 @@ United States</div>
       </colgroup>
       <thead>
         <tr id="colHead">
-          <th>Item</th>
-          <th>Description</th>
-          <th class="qty">Qty</th>
-          <th class="num">Unit Price</th>
-          <th class="num">Amount</th>
+          <th><span data-skey="th-item">Item</span></th>
+          <th><span data-skey="th-desc">Description</span></th>
+          <th class="qty"><span data-skey="th-qty">Qty</span></th>
+          <th class="num"><span data-skey="th-price">Unit Price</span></th>
+          <th class="num"><span data-skey="th-amount">Amount</span></th>
           <th class="grip noprint"></th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
     </table>
 
-    <div class="notes" id="notes" contenteditable="true"></div>
+    <div class="notes" id="notes" data-skey="notes" contenteditable="true"></div>
 
     <div class="bottom">
       <div><span class="paid-stamp" id="paidStamp">PAID</span></div>
       <div class="totals">
-        <div class="trow" id="subRow" style="display:none"><span>Subtotal</span><span id="subT">$ 0.00</span></div>
-        <div class="trow" id="taxRow" style="display:none"><span id="taxLbl">Sales Tax</span><span id="taxT">$ 0.00</span></div>
-        <div class="trow grand"><span>Total</span><span class="amt" id="grand">$ 0.00</span></div>
+        <div class="trow" id="subRow" style="display:none"><span data-skey="lbl-subtotal">Subtotal</span><span id="subT">$ 0.00</span></div>
+        <div class="trow" id="taxRow" style="display:none"><span id="taxLbl" data-skey="lbl-tax">Sales Tax</span><span id="taxT">$ 0.00</span></div>
+        <div class="trow grand"><span data-skey="lbl-total">Total</span><span class="amt" id="grand">$ 0.00</span></div>
       </div>
     </div>
   </div>
 
-  <div class="foot" id="foot" contenteditable="true">Thank you for your business!</div>
+  <div class="foot" id="foot" data-skey="foot" contenteditable="true">Thank you for your business!</div>
+  <div id="ovLayer"></div>
 </div>
 
 <!-- report view (shown by 📊 Report, printable) -->
@@ -526,6 +558,11 @@ United States</div>
   <button onclick="window.ctxAddLine()">＋ Add line below</button>
   <button class="danger" onclick="window.ctxRemoveLine()">✕ Remove line</button>
 </div>
+
+<!-- right-click style menu (built dynamically per target) -->
+<div class="ctx noprint" id="styleMenu" style="min-width:230px"></div>
+<input type="file" id="logoFile" accept="image/*" style="display:none">
+<input type="file" id="ovImgFile" accept="image/*" style="display:none">
 
 <!-- DATA MODAL (admin only) -->
 <div id="sv-data-modal" class="noprint" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px)">
@@ -744,6 +781,7 @@ United States</div>
     const tr = e.target.closest ? e.target.closest('tr') : null;
     if(!tr) return;
     e.preventDefault();
+    if(typeof hideStyle === 'function') hideStyle();
     ctxRow = tr;
     const m = $('ctxMenu');
     m.style.display = 'block';
@@ -1239,6 +1277,286 @@ United States</div>
     applyTheme(t);
   };
 
+  /* ==========================================================
+     TEMPLATE DESIGNER — logo, right-click restyle/rename, wave
+     controls, and free-floating text/image overlays. All stored
+     in sinv_style and applied on load (prints as arranged).
+     ========================================================== */
+  const LS_STYLE = 'sinv_style';
+  const styleStore = () => lsGet(LS_STYLE, {});
+  const putStyleStore = st => lsPut(LS_STYLE, st);
+  const skEl = k => document.querySelector('[data-skey="' + k + '"]');
+  const RENAMEABLE = ['th-item','th-desc','th-qty','th-price','th-amount','mk-date','mk-due','mk-ref','lbl-invoice','lbl-subtotal','lbl-total'];
+  const BG_KEYS = ['sheet','meta','customer','notes','foot'];
+  const SK_NAMES = {
+    'th-item':'Item column', 'th-desc':'Description column', 'th-qty':'Qty column',
+    'th-price':'Unit Price column', 'th-amount':'Amount column',
+    'mk-date':'Invoice Date label', 'mk-due':'Due Date label', 'mk-ref':'Reference label',
+    'lbl-invoice':'"Invoice" heading', 'lbl-subtotal':'Subtotal label', 'lbl-tax':'Sales Tax label',
+    'lbl-total':'Total label', 'customer':'Customer block', 'notes':'Notes', 'foot':'Footer text',
+    'coName':'Company name', 'coTag':'Tagline', 'coAddr':'Company address',
+    'meta':'Date/Reference bar', 'sheet':'Invoice body', 'wave':'Wave divider'
+  };
+  const rgbToHex = s => {
+    const m = String(s).match(/(\d+),\s*(\d+),\s*(\d+)/);
+    if(!m) return '#000000';
+    return '#' + [m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('');
+  };
+
+  function applyDesign(){
+    const st = styleStore();
+    Object.keys(st.labels || {}).forEach(k=>{ const el = skEl(k); if(el) el.textContent = st.labels[k]; });
+    Object.keys(st.colors || {}).forEach(k=>{
+      const el = k === 'sheet' ? $('invSheet') : skEl(k);
+      if(!el) return;
+      const o = st.colors[k];
+      if(o.c) el.style.color = o.c;
+      if(o.bg) el.style.background = o.bg;
+    });
+    const w = st.wave || {};
+    const waveDiv = skEl('wave');
+    if(w.h) waveDiv.style.height = w.h + 'px';
+    const paths = waveDiv.querySelectorAll('path');
+    if(w.lav){ paths[0].style.fill = w.lav; }
+    if(w.rib){ paths[3].style.fill = w.rib; }
+    const sheetBg = st.colors && st.colors.sheet && st.colors.sheet.bg;
+    if(sheetBg){ paths[1].style.fill = sheetBg; paths[2].style.fill = sheetBg; }
+    const lg = st.logo || {};
+    const logo = $('coLogo');
+    if(lg.src){ logo.src = lg.src; logo.style.display = 'block'; logo.style.height = (lg.h || 56) + 'px'; }
+    else { logo.style.display = 'none'; logo.removeAttribute('src'); }
+    renderOverlays();
+  }
+  function setStyleProp(key, prop, val){
+    const st = styleStore();
+    if(prop === 'label'){ (st.labels = st.labels || {})[key] = val; }
+    else if(prop === 'c' || prop === 'bg'){ ((st.colors = st.colors || {})[key] = st.colors[key] || {})[prop] = val; }
+    putStyleStore(st);
+    applyDesign();
+  }
+
+  /* ---------- images: read + downscale to a data URI ---------- */
+  function loadImageFile(file, maxDim, cb){
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let wd = img.width, ht = img.height;
+        if(Math.max(wd, ht) > maxDim){ const s = maxDim / Math.max(wd, ht); wd = Math.round(wd*s); ht = Math.round(ht*s); }
+        const cv = document.createElement('canvas'); cv.width = wd; cv.height = ht;
+        cv.getContext('2d').drawImage(img, 0, 0, wd, ht);
+        cb(cv.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+  $('logoFile').addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    loadImageFile(f, 600, src=>{
+      const st = styleStore(); st.logo = { src: src, h: (st.logo && st.logo.h) || 56 }; putStyleStore(st); applyDesign();
+    });
+    e.target.value = '';
+  });
+  $('ovImgFile').addEventListener('change', e=>{
+    const f = e.target.files && e.target.files[0];
+    if(!f) return;
+    loadImageFile(f, 1000, src=>{ addOverlay({ type:'img', src: src }); });
+    e.target.value = '';
+  });
+
+  /* ---------- overlays (text boxes / images placed anywhere) ---------- */
+  let ovClickPos = null; // where the sheet was right-clicked, in sheet coords
+  function ovList(){ return styleStore().overlays || []; }
+  function putOv(list){ const st = styleStore(); st.overlays = list; putStyleStore(st); }
+  function updOv(id, patch){ putOv(ovList().map(o=>o.id === id ? Object.assign({}, o, patch) : o)); }
+  function addOverlay(o){
+    const sheet = $('invSheet').getBoundingClientRect();
+    o.id = 'ov' + Date.now();
+    o.x = o.x != null ? o.x : (ovClickPos ? ovClickPos.xPct : 10);
+    o.y = o.y != null ? o.y : (ovClickPos ? ovClickPos.yPx : 100);
+    o.w = o.w != null ? o.w : (o.type === 'img' ? 25 : 30);
+    if(o.type === 'text' && !o.html) o.html = 'Double-click to edit this text';
+    putOv(ovList().concat([o]));
+    renderOverlays();
+  }
+  function renderOverlays(){
+    const layer = $('ovLayer');
+    layer.innerHTML = '';
+    ovList().forEach(o=>{
+      const d = document.createElement('div');
+      d.className = 'ov ov-' + o.type;
+      d.dataset.ovid = o.id;
+      d.style.left = o.x + '%'; d.style.top = o.y + 'px'; d.style.width = o.w + '%';
+      if(o.bg) d.style.background = o.bg;
+      if(o.type === 'text'){
+        const t = document.createElement('div');
+        t.className = 'ov-body'; t.contentEditable = 'true'; t.innerHTML = o.html || '';
+        if(o.c) t.style.color = o.c;
+        t.addEventListener('blur', ()=>updOv(o.id, { html: t.innerHTML }));
+        d.appendChild(t);
+      } else {
+        const img = document.createElement('img'); img.src = o.src; img.draggable = false; d.appendChild(img);
+        dragify(img, d, o, 'move'); // images drag from anywhere
+      }
+      const dh = document.createElement('div'); dh.className = 'ov-drag noprint'; dh.textContent = '⠿'; dh.title = 'Drag to move';
+      const rh = document.createElement('div'); rh.className = 'ov-size noprint'; rh.textContent = '◢'; rh.title = 'Drag to resize';
+      d.appendChild(dh); d.appendChild(rh);
+      dragify(dh, d, o, 'move');
+      dragify(rh, d, o, 'size');
+      layer.appendChild(d);
+    });
+  }
+  function dragify(handle, box, o, mode){
+    handle.addEventListener('pointerdown', e=>{
+      e.preventDefault();
+      handle.setPointerCapture(e.pointerId);
+      const sheet = $('invSheet').getBoundingClientRect();
+      const startX = e.clientX, startY = e.clientY;
+      const x0 = parseFloat(box.style.left), y0 = parseFloat(box.style.top), w0 = parseFloat(box.style.width);
+      const move = ev=>{
+        const dxPct = (ev.clientX - startX) / sheet.width * 100;
+        if(mode === 'move'){
+          box.style.left = Math.min(98, Math.max(-10, x0 + dxPct)) + '%';
+          box.style.top = Math.max(0, y0 + (ev.clientY - startY)) + 'px';
+        } else {
+          box.style.width = Math.min(110, Math.max(4, w0 + dxPct)) + '%';
+        }
+      };
+      const up = ()=>{
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        updOv(o.id, { x: Math.round(parseFloat(box.style.left)*10)/10, y: Math.round(parseFloat(box.style.top)), w: Math.round(parseFloat(box.style.width)*10)/10 });
+      };
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+    });
+  }
+
+  /* ---------- right-click style menu ---------- */
+  function hideStyle(){ $('styleMenu').style.display = 'none'; }
+  function menuRow(html){ return html; }
+  function openStyleMenu(e, target){
+    const m = $('styleMenu');
+    const parts = [];
+    const kind = target.kind, key = target.key;
+    parts.push('<div class="ttl">' + escapeHtml(target.name) + '</div>');
+    if(kind === 'skey' && RENAMEABLE.includes(key))
+      parts.push('<button data-act="rename">✏️ Rename…</button>');
+    if(kind === 'skey' && key !== 'wave'){
+      const el = key === 'sheet' ? $('invSheet') : skEl(key);
+      parts.push('<label class="srow">Text color <input type="color" data-sty="c" value="' + rgbToHex(getComputedStyle(el).color) + '"></label>');
+      if(BG_KEYS.includes(key))
+        parts.push('<label class="srow">Background <input type="color" data-sty="bg" value="' + rgbToHex(getComputedStyle(el).backgroundColor) + '"></label>');
+    }
+    if(kind === 'skey' && key === 'wave'){
+      const st = styleStore(), w = st.wave || {};
+      parts.push('<label class="srow">Wave color <input type="color" data-wave="lav" value="' + (w.lav || '#e6e0f8') + '"></label>');
+      parts.push('<label class="srow">Ribbon color <input type="color" data-wave="rib" value="' + (w.rib || '#d8d0f2') + '"></label>');
+      parts.push('<label class="srow">Size <input type="range" data-wave="h" min="20" max="160" value="' + (w.h || 70) + '"></label>');
+    }
+    if(target.inHead){
+      parts.push('<hr>');
+      parts.push('<button data-act="logo">🖼 Upload logo…</button>');
+      const lg = styleStore().logo;
+      if(lg && lg.src){
+        parts.push('<label class="srow">Logo size <input type="range" data-act="logoh" min="24" max="140" value="' + (lg.h || 56) + '"></label>');
+        parts.push('<button data-act="logodel">🗑 Remove logo</button>');
+      }
+    }
+    if(kind === 'overlay'){
+      const o = ovList().find(x=>x.id === target.id) || {};
+      if(o.type === 'text'){
+        parts.push('<label class="srow">Text color <input type="color" data-ov="c" value="' + (o.c || '#1f2430') + '"></label>');
+        parts.push('<label class="srow">Background <input type="color" data-ov="bg" value="' + (o.bg || '#ffffff') + '"></label>');
+      }
+      parts.push('<button data-act="ovfront">⬆️ Bring to front</button>');
+      parts.push('<button class="danger" data-act="ovdel">🗑 Delete</button>');
+    }
+    if(kind === 'skey' || kind === 'sheet'){
+      parts.push('<hr>');
+      parts.push('<button data-act="addtext">📝 Add text box here</button>');
+      parts.push('<button data-act="addimg">🖼 Add image here</button>');
+    }
+    parts.push('<hr>');
+    if(kind === 'skey') parts.push('<button data-act="reset1">↩️ Reset this element</button>');
+    parts.push('<button class="danger" data-act="resetall">↩️ Reset ALL styling</button>');
+    m.innerHTML = parts.join('');
+    m.style.display = 'block';
+    m.style.left = Math.min(e.clientX, window.innerWidth - 260) + 'px';
+    m.style.top = Math.min(e.clientY, window.innerHeight - m.offsetHeight - 10) + 'px';
+
+    m.querySelectorAll('input[data-sty]').forEach(inp=>{
+      inp.addEventListener('input', ()=>setStyleProp(key, inp.dataset.sty, inp.value));
+    });
+    m.querySelectorAll('input[data-wave]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{
+        const st = styleStore(); st.wave = st.wave || {};
+        st.wave[inp.dataset.wave] = inp.dataset.wave === 'h' ? parseInt(inp.value,10) : inp.value;
+        putStyleStore(st); applyDesign();
+      });
+    });
+    m.querySelectorAll('input[data-ov]').forEach(inp=>{
+      inp.addEventListener('input', ()=>{ updOv(target.id, { [inp.dataset.ov]: inp.value }); renderOverlays(); });
+    });
+    m.querySelectorAll('button[data-act]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const act = btn.dataset.act;
+        if(act === 'rename'){
+          const el = skEl(key);
+          const nv = prompt('New label for "' + el.textContent.trim() + '":', el.textContent.trim());
+          if(nv != null && nv.trim() !== '') setStyleProp(key, 'label', nv.trim());
+        }
+        if(act === 'logo') $('logoFile').click();
+        if(act === 'logodel'){ const st = styleStore(); delete st.logo; putStyleStore(st); applyDesign(); }
+        if(act === 'addtext') addOverlay({ type:'text' });
+        if(act === 'addimg') $('ovImgFile').click();
+        if(act === 'ovdel'){ putOv(ovList().filter(o=>o.id !== target.id)); renderOverlays(); }
+        if(act === 'ovfront'){ const l = ovList(); const o = l.find(x=>x.id === target.id); putOv(l.filter(x=>x.id !== target.id).concat([o])); renderOverlays(); }
+        if(act === 'reset1'){
+          const st = styleStore();
+          if(st.labels) delete st.labels[key];
+          if(st.colors) delete st.colors[key];
+          if(key === 'wave') delete st.wave;
+          putStyleStore(st); location.reload();
+        }
+        if(act === 'resetall'){
+          if(confirm('Reset ALL custom styling, logo, and overlay boxes back to the default look?')){
+            try{ localStorage.removeItem(LS_STYLE); }catch(err){}
+            location.reload();
+          }
+        }
+        if(act !== 'logo' && act !== 'addimg') hideStyle(); else hideStyle();
+      });
+    });
+    m.querySelectorAll('label.srow input').forEach(inp=>{
+      inp.addEventListener('click', ev=>ev.stopPropagation());
+    });
+  }
+  // slider drags inside the menu shouldn't close it
+  $('styleMenu').addEventListener('click', e=>e.stopPropagation());
+  document.addEventListener('click', hideStyle);
+  document.addEventListener('keydown', e=>{ if(e.key === 'Escape') hideStyle(); });
+
+  $('invSheet').addEventListener('contextmenu', e=>{
+    if(e.target.closest && e.target.closest('#rows')) return; // line rows keep their own menu
+    e.preventDefault();
+    hideCtx();
+    const sheet = $('invSheet').getBoundingClientRect();
+    ovClickPos = { xPct: Math.round((e.clientX - sheet.left) / sheet.width * 1000)/10, yPx: Math.round(e.clientY - sheet.top) };
+    let target;
+    const ov = e.target.closest('.ov');
+    const skHost = e.target.closest('[data-skey]');
+    const th = e.target.closest('th');
+    if(ov) target = { kind:'overlay', id: ov.dataset.ovid, name: ov.classList.contains('ov-img') ? 'Image' : 'Text box' };
+    else if(th && th.querySelector('[data-skey]')){ const k = th.querySelector('[data-skey]').dataset.skey; target = { kind:'skey', key:k, name: SK_NAMES[k] || k }; }
+    else if(skHost){ const k = skHost.dataset.skey; target = { kind:'skey', key:k, name: SK_NAMES[k] || k }; }
+    else target = { kind:'skey', key:'sheet', name: SK_NAMES.sheet };
+    target.inHead = !!(e.target.closest && e.target.closest('.head'));
+    openStyleMenu(e, target);
+  });
+
   /* ---------- auth-aware footer ---------- */
   const escapeHtml = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   window.applyRoleToUI = function(){
@@ -1264,7 +1582,7 @@ United States</div>
   };
 
   /* ---------- data manager (admin only) ---------- */
-  const SV_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp'];
+  const SV_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp','sinv_style','sinv_theme'];
   window.openDataModal = function(){
     if(window.SV_ROLE !== 'admin'){ alert('Admin only'); return; }
     $('sv-data-status').textContent = '';
@@ -1421,6 +1739,7 @@ United States</div>
   /* ---------- init ---------- */
   try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
   initColResizers();
+  applyDesign();
   loadCompany();
   refreshList('');
   refreshCustList('');
