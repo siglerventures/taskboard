@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.1 -->
+<!-- Accounting (Simple Invoicing) v2.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -207,7 +207,18 @@ onAuthStateChanged(auth, async (user) => {
   .meta .v{ font-size:14px; margin-top:3px; outline:none; min-height:18px; }
 
   /* items table */
-  table.items{ width:100%; border-collapse:collapse; margin-top:26px; font-size:14.5px; }
+  table.items{ width:100%; table-layout:fixed; border-collapse:collapse; margin-top:26px; font-size:14.5px; }
+  table.items th{ position:relative; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.items td{ overflow-wrap:break-word; }
+  .col-resizer{
+    position:absolute; top:0; right:-4px; width:9px; height:100%; cursor:col-resize;
+    z-index:5; touch-action:none;
+  }
+  .col-resizer::after{
+    content:''; position:absolute; top:20%; bottom:20%; left:4px; width:1px;
+    background:var(--line);
+  }
+  .col-resizer:hover::after, .col-resizer.active::after{ background:var(--purple); width:2px; }
   table.items th{
     text-align:left; font-weight:600; color:var(--ink);
     border-bottom:2px solid var(--ink); padding:8px 10px;
@@ -343,6 +354,8 @@ onAuthStateChanged(auth, async (user) => {
     td.c-item input:hover, td.c-item input:focus{ background:transparent; box-shadow:none; }
     table.items tbody tr:nth-child(odd) td, .meta, .rtile,
     table.rtab tbody tr:nth-child(odd) td{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #colGrp col:last-child{ width:0; }
+    .col-resizer{ display:none !important; }
   }
 </style>
 </head>
@@ -374,7 +387,7 @@ onAuthStateChanged(auth, async (user) => {
   <button id="themeBtn" onclick="window.toggleTheme()" title="Switch dark / light mode">🌙 Dark</button>
   <button class="primary" onclick="window.doPrint()">🖨 Print</button>
 </div>
-<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder. 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
+<div class="hint">Click any text on the invoice to edit it — company info and invoice numbering are remembered on this device. Right-click a line to add or remove it; drag the ⋮⋮ handle to reorder; drag the dividers between column headers to resize columns (double-click a divider to reset). 💾 Save keeps the invoice and remembers the customer and items. 🏷 Items manages your item list, prices, and sales tax. 💰 marks the invoice paid. 📊 Report shows paid/unpaid and totals. 🖨 Print to print or save as PDF.</div>
 
 <div class="sheet inv" id="invSheet">
   <div class="head">
@@ -413,13 +426,17 @@ United States</div>
     </div>
 
     <table class="items">
+      <colgroup id="colGrp">
+        <col style="width:26%"><col style="width:38%"><col style="width:8%">
+        <col style="width:13%"><col style="width:15%"><col class="noprint" style="width:26px">
+      </colgroup>
       <thead>
-        <tr>
-          <th style="width:26%">Item</th>
-          <th style="width:38%">Description</th>
-          <th class="qty" style="width:8%">Qty</th>
-          <th class="num" style="width:13%">Unit Price</th>
-          <th class="num" style="width:15%">Amount</th>
+        <tr id="colHead">
+          <th>Item</th>
+          <th>Description</th>
+          <th class="qty">Qty</th>
+          <th class="num">Unit Price</th>
+          <th class="num">Amount</th>
           <th class="grip noprint"></th>
         </tr>
       </thead>
@@ -673,6 +690,54 @@ United States</div>
     }
     recalc();
   });
+  /* ---------- resizable columns ----------
+     Drag the divider at the right edge of a column header to trade width
+     with the next column; double-click a divider to reset all widths. */
+  const DEFAULT_COLW = [26, 38, 8, 13, 15]; // Item, Desc, Qty, Unit Price, Amount (%)
+  const colEls = () => Array.from($('colGrp').querySelectorAll('col')).slice(0,5);
+  function applyColW(w){ colEls().forEach((c,i)=>{ c.style.width = w[i] + '%'; }); }
+  function initColResizers(){
+    const s = settings();
+    applyColW(Array.isArray(s.colW) && s.colW.length === 5 ? s.colW : DEFAULT_COLW);
+    const ths = Array.from($('colHead').children).slice(0,4); // dividers between cols 0-1 … 3-4
+    ths.forEach((th, i)=>{
+      const h = document.createElement('div');
+      h.className = 'col-resizer noprint';
+      h.title = 'Drag to resize — double-click to reset all';
+      th.appendChild(h);
+      h.addEventListener('pointerdown', e=>{
+        e.preventDefault();
+        h.setPointerCapture(e.pointerId);
+        h.classList.add('active');
+        const tableW = h.closest('table').getBoundingClientRect().width;
+        const cur = colEls().map(c=>parseFloat(c.style.width));
+        const startX = e.clientX, a0 = cur[i], b0 = cur[i+1], MIN = 5;
+        const move = ev=>{
+          const d = (ev.clientX - startX) / tableW * 100;
+          let a = a0 + d, b = b0 - d;
+          if(a < MIN){ b -= (MIN - a); a = MIN; }
+          if(b < MIN){ a -= (MIN - b); b = MIN; }
+          cur[i] = a; cur[i+1] = b;
+          applyColW(cur);
+        };
+        const up = ()=>{
+          h.classList.remove('active');
+          h.removeEventListener('pointermove', move);
+          h.removeEventListener('pointerup', up);
+          const st = settings();
+          st.colW = cur.map(x=>Math.round(x*10)/10);
+          lsPut(LS_SET, st);
+        };
+        h.addEventListener('pointermove', move);
+        h.addEventListener('pointerup', up);
+      });
+      h.addEventListener('dblclick', ()=>{
+        const st = settings(); delete st.colW; lsPut(LS_SET, st);
+        applyColW(DEFAULT_COLW);
+      });
+    });
+  }
+
   /* ---------- right-click menu on lines ---------- */
   let ctxRow = null;
   $('rows').addEventListener('contextmenu', e=>{
@@ -1355,6 +1420,7 @@ United States</div>
 
   /* ---------- init ---------- */
   try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
+  initColResizers();
   loadCompany();
   refreshList('');
   refreshCustList('');
