@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v2.4 -->
+<!-- Accounting (Simple Invoicing) v2.5 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1538,6 +1538,41 @@ United States</div>
     });
   }
 
+  /* ---------- saved templates (design snapshots) ----------
+     A template = the whole look: styling/logo/overlays/blocks (sinv_style),
+     letterhead text (sinv_company), and column widths. Saving one keeps a
+     known-good design that can be restored if someone messes things up. */
+  const LS_TPLS = 'sinv_tpls';
+  const tpls = () => lsGet(LS_TPLS, {});
+  window.saveTemplate = function(){
+    const name = prompt('Save the current design as a template named:', 'My template');
+    if(name == null || !name.trim()) return;
+    const t = tpls();
+    t[name.trim()] = {
+      savedAt: today(),
+      style: styleStore(),
+      company: lsGet(LS_CO, null),
+      colW: (settings().colW || null)
+    };
+    lsPut(LS_TPLS, t);
+    alert('Template "' + name.trim() + '" saved. Right-click the invoice any time to restore it.');
+  };
+  window.restoreTemplate = function(name){
+    const rec = tpls()[name];
+    if(!rec) return;
+    if(!confirm('Restore template "' + name + '" (saved ' + (rec.savedAt || '?') + ')? This replaces the current design — invoices, customers, and items are not affected.')) return;
+    putStyleStore(rec.style || {});
+    if(rec.company) lsPut(LS_CO, rec.company);
+    const st = settings();
+    if(rec.colW) st.colW = rec.colW; else delete st.colW;
+    lsPut(LS_SET, st);
+    location.reload();
+  };
+  window.deleteTemplate = function(name){
+    if(!confirm('Delete saved template "' + name + '"?')) return;
+    const t = tpls(); delete t[name]; lsPut(LS_TPLS, t);
+  };
+
   /* ---------- right-click style menu ---------- */
   function hideStyle(){ $('styleMenu').style.display = 'none'; }
   function menuRow(html){ return html; }
@@ -1586,6 +1621,14 @@ United States</div>
       parts.push('<button data-act="addimg">🖼 Add image here</button>');
     }
     parts.push('<hr>');
+    parts.push('<div class="ttl">Templates</div>');
+    parts.push('<button data-act="tplsave">💾 Save current design as template…</button>');
+    Object.keys(tpls()).sort().forEach(n=>{
+      parts.push('<div style="display:flex;gap:2px;align-items:stretch">'
+        + '<button style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" data-tpl="' + escapeHtml(n) + '">↩️ Restore “' + escapeHtml(n) + '”</button>'
+        + '<button data-tpldel="' + escapeHtml(n) + '" title="Delete this template" style="width:34px;color:#c33">✕</button></div>');
+    });
+    parts.push('<hr>');
     if(kind === 'skey') parts.push('<button data-act="reset1">↩️ Reset this element</button>');
     parts.push('<button class="danger" data-act="resetall">↩️ Reset ALL styling</button>');
     m.innerHTML = parts.join('');
@@ -1614,6 +1657,7 @@ United States</div>
           const nv = prompt('New label for "' + el.textContent.trim() + '":', el.textContent.trim());
           if(nv != null && nv.trim() !== '') setStyleProp(key, 'label', nv.trim());
         }
+        if(act === 'tplsave'){ hideStyle(); window.saveTemplate(); return; }
         if(act === 'blockreset'){
           const st = styleStore();
           if(st.blocks) delete st.blocks[key];
@@ -1644,6 +1688,12 @@ United States</div>
     });
     m.querySelectorAll('label.srow input').forEach(inp=>{
       inp.addEventListener('click', ev=>ev.stopPropagation());
+    });
+    m.querySelectorAll('button[data-tpl]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ hideStyle(); window.restoreTemplate(btn.dataset.tpl); });
+    });
+    m.querySelectorAll('button[data-tpldel]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{ hideStyle(); window.deleteTemplate(btn.dataset.tpldel); });
     });
   }
   // slider drags inside the menu shouldn't close it
@@ -1694,7 +1744,7 @@ United States</div>
   };
 
   /* ---------- data manager (admin only) ---------- */
-  const SV_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp','sinv_style','sinv_theme'];
+  const SV_KEYS = ['sinv_company','sinv_seq','sinv_docs','sinv_custs','sinv_items','sinv_set','sinv_exp','sinv_style','sinv_theme','sinv_tpls'];
   window.openDataModal = function(){
     if(window.SV_ROLE !== 'admin'){ alert('Admin only'); return; }
     $('sv-data-status').textContent = '';
