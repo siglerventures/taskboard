@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.1 — data lives in Firebase RTDB under /accounting; multi-business -->
+<!-- Accounting (Simple Invoicing) v3.2 — data lives in Firebase RTDB under /accounting; multi-business -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -712,7 +712,7 @@ United States</div>
     if(window._fbReady && window.SV_ROLE){
       try{
         window._fbSet(window._fbRefFn(window._fbDb, cloudPath(key)), str)
-          .catch(err=>{ console.error('Cloud save failed (' + key + '):', err); syncNote('⚠️ Cloud save failed — kept on this device'); });
+          .catch(err=>{ console.error('Cloud save failed (' + key + '):', err); syncNote('⚠️ Cloud save failed (' + svErrText(err) + ') — kept on this device'); });
       }catch(e){}
     }
   }
@@ -804,6 +804,13 @@ United States</div>
   function lsGet(key, fallback){ try{ return JSON.parse(getRaw(key)||'null') || fallback; }catch(e){ return fallback; } }
   function lsPut(key, val){ putRaw(key, JSON.stringify(val)); }
 
+  // turn a Firebase error into a short human reason for the toast
+  function svErrText(err){
+    const s = String((err && (err.code || err.message)) || err || 'unknown');
+    if(/permission.denied/i.test(s)) return 'no permission — check the /accounting block in the database rules';
+    if(/network|offline|disconnect|timeout/i.test(s)) return 'network problem';
+    return s.slice(0, 80);
+  }
   let _syncNoteTimer = null;
   function syncNote(msg){
     let n = $('syncNote');
@@ -814,7 +821,7 @@ United States</div>
     }
     n.textContent = msg; n.style.display = 'block';
     clearTimeout(_syncNoteTimer);
-    _syncNoteTimer = setTimeout(()=>{ n.style.display = 'none'; }, 3000);
+    _syncNoteTimer = setTimeout(()=>{ n.style.display = 'none'; }, msg.indexOf('⚠️') === 0 ? 9000 : 3000);
   }
 
   // re-render whatever a synced key drives (called when another device changed it)
@@ -860,7 +867,7 @@ United States</div>
         if(!announced){ announced = true; syncNote('Synced ☁️'); }
       }, err=>{
         console.error('Sync listener failed (' + k + '):', err);
-        syncNote('⚠️ Offline — using this device\'s data');
+        syncNote('⚠️ Not syncing (' + svErrText(err) + ') — using this device\'s data');
       });
     });
     syncNote('Synced ☁️');
