@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.2 — data lives in Firebase RTDB under /accounting; multi-business -->
+<!-- Accounting (Simple Invoicing) v3.3 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -655,7 +655,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.1</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.3</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -838,6 +838,31 @@ United States</div>
     }
     if(document.body.classList.contains('reporting')) buildReport();
   }
+  // Combine a differing cloud copy and local copy of one key without losing
+  // either side. Maps (invoices, customers, items, templates) are unioned
+  // with LOCAL winning on a same-key conflict (it's what this user saw last);
+  // the expense list is unioned; the numbering counter takes the max; for
+  // company/style/settings the local copy wins.
+  function mergeKey(k, localStr, remoteStr){
+    try{
+      const L = JSON.parse(localStr), R = JSON.parse(remoteStr);
+      if(k === 'sinv_docs' || k === 'sinv_custs' || k === 'sinv_items' || k === 'sinv_tpls'){
+        return JSON.stringify(Object.assign({}, R, L));
+      }
+      if(k === 'sinv_exp'){
+        const out = Array.isArray(R) ? R.slice() : [];
+        const seen = {};
+        out.forEach(e=>{ seen[JSON.stringify(e)] = true; });
+        (Array.isArray(L) ? L : []).forEach(e=>{ const s = JSON.stringify(e); if(!seen[s]){ seen[s] = true; out.push(e); } });
+        return JSON.stringify(out);
+      }
+      if(k === 'sinv_seq'){
+        return String(Math.max(parseInt(L,10)||0, parseInt(R,10)||0));
+      }
+      return localStr; // company / style / settings: this device's copy wins
+    }catch(e){ return localStr; }
+  }
+
   let _syncAttached = false;
   window.attachAccountingSync = function(){
     if(_syncAttached || !window._fbOnValue) return;
@@ -849,18 +874,45 @@ United States</div>
       if(remote == null){ regPut(regGet()); return; } // seed the registry
       if(typeof remote !== 'string') return;
       try{ if(remote === localStorage.getItem(REG_LKEY)) return; }catch(e){}
-      try{ localStorage.setItem(REG_LKEY, remote); }catch(e){}
+      // merge registries (union of businesses) instead of adopting blindly
+      let regMerged = remote;
+      try{
+        const loc = JSON.parse(localStorage.getItem(REG_LKEY) || 'null');
+        if(loc){ regMerged = JSON.stringify(Object.assign({}, JSON.parse(remote), loc)); }
+      }catch(e){}
+      try{ localStorage.setItem(REG_LKEY, regMerged); }catch(e){}
+      if(regMerged !== remote && window._fbReady && window.SV_ROLE){
+        try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/businesses'), regMerged).catch(()=>{}); }catch(e){}
+      }
       refreshBizList();
     }, ()=>{});
+    const _seenKey = {};
     DATA_KEYS.forEach(k=>{
       window._fbOnValue(window._fbRefFn(window._fbDb, cloudPath(k)), snap=>{
         const remote = snap.val();
         if(remote == null){
+          _seenKey[k] = true;
           // nothing in the cloud yet for this key — migrate this device's copy up
           if(DB[k] != null) putRaw(k, DB[k]);
           return;
         }
-        if(typeof remote !== 'string' || remote === DB[k]) return; // echo of our own write
+        if(typeof remote !== 'string' || remote === DB[k]){ _seenKey[k] = true; return; } // echo of our own write
+        if(!_seenKey[k] && DB[k] != null){
+          // FIRST snapshot after sign-in and this device disagrees with the
+          // cloud (e.g. the device worked offline for a while). NEVER discard
+          // either side: stash the local copy, merge cloud + local, push the
+          // merged result up.
+          _seenKey[k] = true;
+          try{ localStorage.setItem('sinv_rescue:' + new Date().toISOString().slice(0,10) + ':' + lk(k), DB[k]); }catch(e){}
+          const merged = mergeKey(k, DB[k], remote);
+          DB[k] = merged;
+          try{ localStorage.setItem(lk(k), merged); }catch(e){}
+          if(merged !== remote) putRaw(k, merged);
+          refreshFromData(k);
+          if(!announced){ announced = true; syncNote('Merged ☁️ — cloud and this device combined'); }
+          return;
+        }
+        _seenKey[k] = true;
         DB[k] = remote;
         try{ localStorage.setItem(lk(k), remote); }catch(e){}
         refreshFromData(k);
