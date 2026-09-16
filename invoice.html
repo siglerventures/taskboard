@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.3 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
+<!-- Accounting (Simple Invoicing) v3.4 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -655,7 +655,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.3</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.4</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -748,6 +748,51 @@ United States</div>
     const n = document.createElement('option'); n.value = '__new'; n.textContent = '＋ New Business…'; s.appendChild(n);
     s.value = reg[CUR_BIZ] ? CUR_BIZ : 'main';
   }
+  /* ---------- recover businesses whose registry entry was lost ----------
+     A business's data lives at biz:<id>:sinv_* in localStorage even if its
+     entry vanishes from the shared registry (e.g. an older cloud registry
+     overwrote the local one before v3.3's merge fix). Detect such orphaned
+     namespaces and offer to re-attach them to the dropdown. */
+  function orphanBizIds(){
+    const reg = regGet();
+    const ids = {};
+    try{
+      for(let i = 0; i < localStorage.length; i++){
+        const k = localStorage.key(i);
+        const m = k && k.match(/^biz:([^:]+):sinv_/);
+        if(m && !reg[m[1]]) ids[m[1]] = true;
+      }
+    }catch(e){}
+    let ign = {};
+    try{ ign = JSON.parse(localStorage.getItem('sinv_orphan_ignored')||'{}'); }catch(e){}
+    return Object.keys(ids).filter(id=>!ign[id]);
+  }
+  function checkOrphanBiz(){
+    orphanBizIds().forEach(id=>{
+      let info = 'no invoices yet (design/items only)';
+      try{
+        const d = JSON.parse(localStorage.getItem('biz:' + id + ':sinv_docs') || '{}');
+        const nums = Object.keys(d).sort();
+        if(nums.length) info = nums.length + ' invoice(s): #' + nums.join(', #');
+      }catch(e){}
+      if(confirm('Found saved data on this device for a business that is MISSING from your business list — ' + info + '.\n\nRe-attach it to the business dropdown?')){
+        const name = prompt('Name for this business:', '');
+        if(name && name.trim()){
+          const reg = regGet();
+          reg[id] = { name: name.trim() };
+          regPut(reg);
+          syncNote('Business re-attached — pick it in the dropdown');
+        }
+      } else {
+        try{
+          const ign = JSON.parse(localStorage.getItem('sinv_orphan_ignored')||'{}');
+          ign[id] = true;
+          localStorage.setItem('sinv_orphan_ignored', JSON.stringify(ign));
+        }catch(e){}
+      }
+    });
+  }
+
   window.bizChanged = function(){
     const v = $('bizList').value;
     if(v === '__new'){ refreshBizList(); window.newBusiness(); return; }
@@ -2159,6 +2204,7 @@ United States</div>
   /* ---------- init ---------- */
   try{ applyTheme(localStorage.getItem(LS_THEME) || 'light'); }catch(e){ applyTheme('light'); }
   refreshBizList();
+  setTimeout(checkOrphanBiz, 900);
   initColResizers();
   loadCompany();
   applyDesign();
