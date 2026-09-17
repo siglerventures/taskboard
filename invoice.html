@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.5 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
+<!-- Accounting (Simple Invoicing) v3.6 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -571,6 +571,22 @@ United States</div>
   </div>
 </div>
 
+<!-- manage businesses modal -->
+<div class="modal-bg noprint" id="bizModal">
+  <div class="modal">
+    <h2>🏢 Manage Businesses</h2>
+    <table>
+      <thead><tr><th>Name</th><th style="width:150px">Invoices</th><th style="width:90px"></th></tr></thead>
+      <tbody id="bizRows"></tbody>
+    </table>
+    <div class="rowbtns">
+      <button class="primary" onclick="window.saveBizNames()">Save Names</button>
+      <button onclick="window.closeBizManager()">Close</button>
+    </div>
+    <div class="mnote">Edit a name and hit Save Names. Deleting a business removes its invoices, customers, items, and design for everyone — the business you're currently viewing can't be deleted (switch to another first), and the original business only when it's empty.</div>
+  </div>
+</div>
+
 <datalist id="itemsDL"></datalist>
 
 <!-- right-click menu for invoice lines -->
@@ -655,7 +671,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.5</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.6</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -746,6 +762,7 @@ United States</div>
       const o = document.createElement('option'); o.value = id; o.textContent = '🏢 ' + (reg[id].name || id); s.appendChild(o);
     });
     const n = document.createElement('option'); n.value = '__new'; n.textContent = '＋ New Business…'; s.appendChild(n);
+    const g = document.createElement('option'); g.value = '__manage'; g.textContent = '⚙ Manage Businesses…'; s.appendChild(g);
     s.value = reg[CUR_BIZ] ? CUR_BIZ : 'main';
   }
   /* ---------- recover businesses whose registry entry was lost ----------
@@ -793,9 +810,92 @@ United States</div>
     });
   }
 
+  /* ---------- manage businesses (rename / delete any of them) ---------- */
+  const bizDocsKeyLocal = id => id === 'main' ? 'sinv_docs' : 'biz:' + id + ':sinv_docs';
+  const bizCloudPathFor = (id, k) => 'accounting/' + (id === 'main' ? 'data/' : 'biz/' + id + '/') + k;
+  window.openBizManager = function(){
+    const reg = regGet();
+    const tb = $('bizRows');
+    tb.innerHTML = '';
+    Object.keys(reg).sort((a,b)=>(reg[a].name||'').localeCompare(reg[b].name||'')).forEach(id=>{
+      const tr = document.createElement('tr');
+      tr.dataset.bid = id;
+      tr.innerHTML = '<td><input type="text" class="bm-name"></td><td class="bm-count">…</td><td class="bm-act"></td>';
+      tr.querySelector('.bm-name').value = reg[id].name || id;
+      const act = tr.querySelector('.bm-act');
+      if(id === CUR_BIZ){
+        act.innerHTML = '<span style="font-size:12px;color:#94a3b8">current</span>';
+      } else {
+        const del = document.createElement('button');
+        del.textContent = '🗑 Delete';
+        del.style.cssText = 'background:#1c0a0a;border:0.5px solid #7f1d1d;color:#f87171;padding:5px 10px;border-radius:6px;font-size:12px;cursor:pointer';
+        del.addEventListener('click', ()=>window.deleteBizRow(id));
+        act.appendChild(del);
+      }
+      let n = 0;
+      try{ n = Object.keys(JSON.parse(localStorage.getItem(bizDocsKeyLocal(id))||'{}')).length; }catch(e){}
+      tr.querySelector('.bm-count').textContent = n + ' invoice(s) here';
+      if(window._fbGet && window._fbReady && window.SV_ROLE){
+        try{
+          window._fbGet(window._fbRefFn(window._fbDb, bizCloudPathFor(id, 'sinv_docs'))).then(s=>{
+            let c = 0;
+            try{ c = Object.keys(JSON.parse(s.val()||'{}')).length; }catch(e){}
+            const cell = document.querySelector('#bizRows tr[data-bid="' + id + '"] .bm-count');
+            if(cell) cell.textContent = n + ' here / ' + c + ' in cloud';
+          }).catch(()=>{});
+        }catch(e){}
+      }
+      tb.appendChild(tr);
+    });
+    $('bizModal').classList.add('open');
+  };
+  window.closeBizManager = function(){ $('bizModal').classList.remove('open'); };
+  window.saveBizNames = function(){
+    const reg = regGet();
+    document.querySelectorAll('#bizRows tr').forEach(tr=>{
+      const id = tr.dataset.bid;
+      const name = tr.querySelector('.bm-name').value.trim();
+      if(reg[id] && name) reg[id].name = name;
+    });
+    regPut(reg);
+    window.closeBizManager();
+    syncNote('Business names saved');
+  };
+  window.deleteBizRow = function(id){
+    const reg = regGet();
+    const name = (reg[id] && reg[id].name) || id;
+    if(id === CUR_BIZ){ alert('Switch to another business first.'); return; }
+    let n = 0;
+    try{ n = Object.keys(JSON.parse(localStorage.getItem(bizDocsKeyLocal(id))||'{}')).length; }catch(e){}
+    if(id === 'main' && n > 0){
+      alert('\u201c' + name + '\u201d is the original business and still holds ' + n + ' invoice(s) on this device \u2014 it can only be removed when it\u2019s empty.');
+      return;
+    }
+    if(!confirm('Delete business \u201c' + name + '\u201d and ALL of its data (' + n + ' invoice(s) on this device, plus customers, items, and design) \u2014 for everyone? This cannot be undone.')) return;
+    if(n > 0 && !confirm('Really delete \u201c' + name + '\u201d? Consider a \ud83d\udce6 backup of it first.')) return;
+    delete reg[id];
+    regPut(reg);
+    if(id === 'main'){
+      DATA_KEYS.forEach(k=>{
+        try{ localStorage.removeItem(k); }catch(e){}
+        if(window._fbReady && window.SV_ROLE){
+          try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/data/' + k), null).catch(()=>{}); }catch(e){}
+        }
+      });
+    } else {
+      DATA_KEYS.forEach(k=>{ try{ localStorage.removeItem('biz:' + id + ':' + k); }catch(e){} });
+      if(window._fbReady && window.SV_ROLE){
+        try{ window._fbSet(window._fbRefFn(window._fbDb, 'accounting/biz/' + id), null).catch(()=>{}); }catch(e){}
+      }
+    }
+    window.openBizManager();
+    syncNote('Business deleted');
+  };
+
   window.bizChanged = function(){
     const v = $('bizList').value;
     if(v === '__new'){ refreshBizList(); window.newBusiness(); return; }
+    if(v === '__manage'){ refreshBizList(); window.openBizManager(); return; }
     if(v && v !== CUR_BIZ){
       try{ localStorage.setItem(LS_CURBIZ, v); }catch(e){}
       location.reload();
