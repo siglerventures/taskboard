@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Accounting (Simple Invoicing) v3.4 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
+<!-- Accounting (Simple Invoicing) v3.5 — data lives in Firebase RTDB under /accounting; multi-business; merge-safe sync -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -655,7 +655,7 @@ United States</div>
 </div>
 
 <!-- page footer — matches the Task Board footer -->
-<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.4</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
+<div class="noprint" style="text-align:center;padding:4px 0 14px;font-size:11px;color:var(--foot)"><span id="sv-version">v3.5</span> <span id="sv-data-link" onclick="openDataModal()" style="cursor:pointer;color:var(--foot);display:none">· 📦 Data </span><span onclick="window.footerHistory()" style="cursor:pointer;color:var(--foot)">· 📜 History </span><span id="sv-access-link" onclick="openAccessModal()" style="cursor:pointer;color:var(--foot);display:none">· 👥 People </span><span id="sv-user-pill" style="display:none;color:var(--foot);vertical-align:middle"></span> · <span onclick="if(confirm('Sign out of Accounting?'))doSignOut()" style="cursor:pointer;color:var(--foot)">🚪 Sign Out</span></div>
 
 <script>
 (function(){
@@ -2116,7 +2116,8 @@ United States</div>
       try{
         const backup = JSON.parse(reader.result);
         if(!backup || backup.app !== 'accounting' || !backup.data) throw new Error('Not an accounting backup file');
-        if(!confirm('Restore backup from ' + (backup.exportedAt||'unknown date') + '? This replaces the current data (including the cloud copy for everyone).')) return;
+        const bizName = (regGet()[CUR_BIZ] || {}).name || CUR_BIZ;
+        if(!confirm('Restore this backup INTO THE BUSINESS \u201c' + bizName + '\u201d?\n\nBackup from: ' + (backup.exportedAt||'unknown date') + '\nThis REPLACES \u201c' + bizName + '\u201d\u2019s current data, including the cloud copy for everyone.\n\nIf this backup belongs to a different business, click Cancel and switch businesses in the toolbar first.')) return;
         SV_KEYS.forEach(k=>{
           if(backup.data[k] != null) putRaw(k, backup.data[k]);
           else delRaw(k);
